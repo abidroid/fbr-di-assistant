@@ -1,8 +1,6 @@
-# Learning Log
+# Learning Log: Phase 0 (Environment)
 
-My own explanations after each phase, with corrections. These are my notes for the demo video.
-
-## Phase 0 — Environment
+My own explanations after the phase, with corrections. These are my notes for the demo video.
 
 **1. Why do `uv.lock` and a pinned `requirements.txt` make the project reproducible?**
 Another user can install the same packages using `uv.lock` and `requirements.txt`.

@@ -51,7 +51,7 @@ API key in Git costs marks, so `.env` goes in `.gitignore` before the first comm
 4. Let it build. Watch the files it creates; ask "why" whenever something is new.
 5. Run the "Done when" checks yourself.
 6. Answer the **Explain it back** questions in your own words. Claude corrects you and saves your
-   answers to `docs/LEARNING_LOG.md`. These become your video notes.
+   answers to `docs/learning-logs/phase-NN.md`. These become your video notes.
 7. `/export docs/ai-logs/phase-NN.md`, then ruff + pytest, push, `gh pr create --fill`, merge.
 
 ## 3. Architecture in one picture
@@ -463,7 +463,7 @@ Phase 3, 5 or 6.
 | 14 | Bonuses | 1.5 | JWT isolation, Urdu, Langfuse dashboard, live URL |
 
 Segments 3 and 11 decide whether the panel believes you understand the system. Rehearse them from
-your `LEARNING_LOG.md`, in your own words.
+your `docs/learning-logs/`, in your own words.
 
 ## 10. Final checklist
 
