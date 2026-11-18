@@ -21,3 +21,12 @@ qdrant_storage/
 
 # Model caches
 .cache/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Frontend
+node_modules/
+frontend/dist/
