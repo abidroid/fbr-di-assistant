@@ -6,6 +6,7 @@ Run on your own computer (needs Python 3.8+, no extra packages):
 Files go into ./legal/ and a manifest.jsonl is written alongside them with
 metadata you can attach to every chunk at ingestion time.
 """
+
 import json
 import sys
 import time
@@ -18,16 +19,26 @@ DOCS = [
         "file": "sales_tax_act_1990_upto_2026-06-30.pdf",
         "title": "Sales Tax Act, 1990 (updated up to 30.06.2026)",
         "url": "https://download1.fbr.gov.pk/Docs/20267171373418951SalesTaxAct1990updatedupto30.06.2026.pdf",
-        "covers": ["Sales Tax Act 1990 s.2(15A)", "Sales Tax Act 1990 s.2(44)", "Sales Tax Act 1990 s.9",
-                   "Sales Tax Act 1990 s.23(1)(b)", "Sales Tax Act 1990 s.33"],
+        "covers": [
+            "Sales Tax Act 1990 s.2(15A)",
+            "Sales Tax Act 1990 s.2(44)",
+            "Sales Tax Act 1990 s.9",
+            "Sales Tax Act 1990 s.23(1)(b)",
+            "Sales Tax Act 1990 s.33",
+        ],
         "doc_type": "act",
     },
     {
         "file": "sales_tax_rules_2006_upto_2026-07-31.pdf",
         "title": "The Sales Tax Rules, 2006 (updated up to 31st July, 2026)",
         "url": "https://download1.fbr.gov.pk/Docs/202691810951482SalesTaxRules.pdf",
-        "covers": ["Sales Tax Rules 2006 Chapter XIV", "Sales Tax Rules 2006 r.150XE", "Sales Tax Rules 2006 r.150XF",
-                   "Sales Tax Rules 2006 r.150XJ(1)", "Sales Tax Rules 2006 r.150XL"],
+        "covers": [
+            "Sales Tax Rules 2006 Chapter XIV",
+            "Sales Tax Rules 2006 r.150XE",
+            "Sales Tax Rules 2006 r.150XF",
+            "Sales Tax Rules 2006 r.150XJ(1)",
+            "Sales Tax Rules 2006 r.150XL",
+        ],
         "doc_type": "rules",
     },
     {
@@ -82,6 +93,11 @@ def safe_url(url: str) -> str:
 
 
 def main() -> int:
+    """Download each legal PDF into ./legal and write its manifest.
+
+    Returns:
+        Exit code: 1 if any download failed, otherwise 0.
+    """
     out = Path("legal")
     out.mkdir(exist_ok=True)
     manifest, failed = [], []
@@ -91,21 +107,30 @@ def main() -> int:
             print(f"skip (exists)  {dest.name}")
         else:
             try:
-                req = urllib.request.Request(safe_url(d["url"]), headers={"User-Agent": "Mozilla/5.0"})
+                req = urllib.request.Request(
+                    safe_url(d["url"]), headers={"User-Agent": "Mozilla/5.0"}
+                )
                 with urllib.request.urlopen(req, timeout=60) as r:
                     data = r.read()
                 if not data.startswith(b"%PDF"):
                     raise ValueError("response is not a PDF")
                 dest.write_bytes(data)
-                print(f"ok  {len(data)/1e6:5.1f} MB  {dest.name}")
+                print(f"ok  {len(data) / 1e6:5.1f} MB  {dest.name}")
             except Exception as e:  # keep going; report at the end
                 print(f"FAILED  {dest.name}: {e}")
                 failed.append(d["url"])
                 continue
             time.sleep(1)  # be polite to FBR's server
-        manifest.append({**d, "publisher": "FBR", "authority": "law" if d["doc_type"] in
-                         {"act", "rules", "sro"} else "official_guidance",
-                         "retrieved": time.strftime("%Y-%m-%d")})
+        manifest.append(
+            {
+                **d,
+                "publisher": "FBR",
+                "authority": "law"
+                if d["doc_type"] in {"act", "rules", "sro"}
+                else "official_guidance",
+                "retrieved": time.strftime("%Y-%m-%d"),
+            }
+        )
     with (out / "manifest.jsonl").open("w", encoding="utf-8") as f:
         for m in manifest:
             f.write(json.dumps(m, ensure_ascii=False) + "\n")

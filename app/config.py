@@ -108,9 +108,7 @@ def get_settings() -> Settings:
     try:
         return Settings()  # type: ignore[call-arg]  # required fields come from .env
     except ValidationError as exc:
-        fields = ", ".join(
-            ".".join(map(str, err["loc"])).upper() for err in exc.errors()
-        )
+        fields = ", ".join(".".join(map(str, err["loc"])).upper() for err in exc.errors())
         raise RuntimeError(f"Invalid or missing settings in .env: {fields}") from None
 
 

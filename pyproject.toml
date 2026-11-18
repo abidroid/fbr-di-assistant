@@ -32,3 +32,21 @@ dev = [
     "pytest-asyncio>=1.5.0",
     "ruff>=0.17.5",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# E/F: errors, I: import order, UP: modern syntax, B: likely bugs, D: docstrings.
+select = ["E", "F", "I", "UP", "B", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Test names already say what they check; a docstring on each would repeat it.
+"tests/**" = ["D103"]
+# Data scripts hold long FAQ text and URLs that cannot be wrapped.
+"scripts/**" = ["E501"]
