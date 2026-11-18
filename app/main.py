@@ -14,12 +14,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from qdrant_client import AsyncQdrantClient
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError
 from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
+from app.routes import health
 from app.schemas import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -35,9 +37,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Yields:
         Control back to FastAPI while the app serves requests.
     """
-    yield
-    # Close pooled Neon connections cleanly instead of letting them be dropped.
-    await engine.dispose()
+    # One client for the whole app: it keeps a connection pool, so creating one
+    # per request would waste a connection setup on every call.
+    api_key = settings.qdrant_api_key.get_secret_value() if settings.qdrant_api_key else None
+    app.state.qdrant = AsyncQdrantClient(
+        url=settings.qdrant_url, api_key=api_key, timeout=settings.qdrant_timeout_s
+    )
+    try:
+        yield
+    finally:
+        await app.state.qdrant.close()
+        # Close pooled Neon connections cleanly instead of letting them be dropped.
+        await engine.dispose()
 
 
 def error_response(
@@ -168,6 +179,8 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)
+
+    app.include_router(health.router)
     return app
 
 
