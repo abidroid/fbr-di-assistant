@@ -56,3 +56,62 @@ why `.env` is in `.gitignore`, only `.env.example` with dummy values is committe
 `SecretStr` so values don't appear in logs or recordings.
 
 My words:
+
+## Extra questions I asked
+
+> Answers written by Claude Code after I asked these questions. I will restate them in my own words.
+
+**4. What is `JWT_SECRET_KEY` for?**
+
+It is the key the server uses to sign login tokens (built in Phase 2).
+- At login the server returns a JWT: `header.payload.signature`. The payload holds e.g. the user id
+  and expiry time. The signature is computed from the payload plus `JWT_SECRET_KEY` (HMAC-SHA256).
+- On every request the server recomputes the signature with its secret. If it matches, the token is
+  genuine and unchanged, so the server trusts the user id inside it.
+- Without the secret, anyone could forge a token claiming another user's id and read their documents.
+- Analogy: a wax seal. Anyone can read the letter, but only the seal's owner can make a valid seal.
+- Signed, not encrypted: the payload is only base64, so nothing secret goes inside a token.
+- Trade-off: stateless tokens need no database lookup per request (fast), but cannot be revoked
+  before they expire, so expiry is short (60 min). Changing the secret logs everyone out.
+- It must be long and random so it cannot be brute-forced.
+
+My words:
+
+**5. What do Qdrant and Docker do?**
+
+Qdrant is the vector database: search by meaning.
+- In Phase 4 each document is split into chunks; each chunk becomes 1024 numbers (BGE-M3) that
+  capture its meaning, plus a keyword vector (BM25). Qdrant stores these with the chunk's text, page,
+  `doc_id` and `owner_id`.
+- A question is turned into numbers the same way, and Qdrant finds the closest chunks in milliseconds
+  (HNSW index). A filter on `owner_id` means users only search their own documents.
+- Neon stores accounts and the document list (who owns what, status); Qdrant stores chunks and vectors.
+- Why not pgvector in Postgres: Qdrant natively combines dense + keyword search with RRF fusion and
+  filtering, which exact codes like `0052` or `SN009` need.
+
+Docker runs Qdrant for us.
+- A container packages an app with everything it needs, so the exact pinned version (`v1.20.1`) runs
+  with one command, identical on my laptop and on the server, without installing Qdrant on Windows.
+- The named volume keeps the vectors on disk across restarts.
+- Analogy: a shipping container runs the same on any ship.
+
+My words:
+
+**6. Will these be set up in production too?**
+
+Yes, in Phase 11 on a Linux VPS (4 vCPU / 8 GB) with Docker Compose.
+
+| Piece | Laptop (dev) | Production (VPS) |
+|---|---|---|
+| API | `uv run fastapi dev` | Docker container `api` |
+| Qdrant | Docker container | Docker container, same pinned image, own volume, not exposed to the internet (only the API reaches it over Docker's internal network) |
+| Caddy | none | Docker container: HTTPS, serves the built React app, forwards API calls |
+| Neon | cloud database | same cloud service, nothing to install; the VPS connects over the internet (5432 not blocked there) |
+| `JWT_SECRET_KEY` | dev value | a new random value in the VPS's own `.env`, never reused |
+| `HEALTH_TIMEOUT_S` | 10 (slow hotspot) | default 3 (fast link to Singapore) |
+
+To decide in Phase 11: which Neon branch production uses (recommended: a separate `deploy` branch so
+demo data is not mixed with dev experiments), and re-running ingestion on the VPS, because vectors are
+not copied from the laptop.
+
+My words:
