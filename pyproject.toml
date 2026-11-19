@@ -55,3 +55,6 @@ convention = "google"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+# Tests share the fixtures' event loop: database connections belong to the loop
+# that opened them and fail if used from another one.
+asyncio_default_test_loop_scope = "session"
