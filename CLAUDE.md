@@ -88,7 +88,7 @@ tests/                    conftest.py, test_auth.py, test_documents.py, test_ask
 corpus/                   source PDFs (GIT-IGNORED except corpus/README.md, faqs.jsonl, manifest.jsonl)
 scripts/                  download_corpus.py, build_faqs.py, seed_demo.py
 frontend/                 React app
-docs/                     ai-logs/, screenshots/, AI_USAGE.md, LEARNING_LOG.md, DEVELOPMENT_PLAN.md
+docs/                     ai-logs/, screenshots/, AI_USAGE.md, learning-logs/ (phase-NN.md), DEVELOPMENT_PLAN.md
 DESIGN.md  EVAL.md  README.md  CLAUDE.md  docker-compose.yml  Caddyfile  .env.example
 ```
 The brief suggests `ingestion/, retrieval.py, generation.py, guardrails.py, main.py, evals/, tests/`;
@@ -186,7 +186,7 @@ keep those names exactly so the grader finds them, and explain the extra modules
    it sits in the request flow. Keep functions small enough to explain.
 3. **After a phase:** summarise what changed, explain each new function simply, then ask the developer
    3 check questions (from the plan's "Explain it back" list). Wait for their answers, correct gently,
-   and append their own words (cleaned up, not rewritten) to `docs/LEARNING_LOG.md` under the phase.
+   and append their own words (cleaned up, not rewritten) to `docs/learning-logs/phase-NN.md`.
 4. When the developer asks "why", answer with the trade-off (quality, cost, speed, latency), not just the rule.
 5. Never introduce a library, pattern or config value without one sentence on why it is needed.
 6. Ask before adding any dependency not named in this file or the plan.
