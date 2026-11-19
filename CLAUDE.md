@@ -176,7 +176,7 @@ keep those names exactly so the grader finds them, and explain the extra modules
 - Never commit directly to main except the initial scaffold.
 - One branch per phase (see docs/DEVELOPMENT_PLAN.md), Conventional Commits, 3-8 small commits per branch.
 - Before the last commit on a branch: ruff check, ruff format, pytest.
-- Merge via `gh pr create --fill`, merge commit (not squash), delete branch.
+- Merge via `gh pr create --fill`, merge commit (not squash) with `gh pr merge --merge`; keep the branch (do not delete it).
 - Never commit `.env`, corpus PDFs, model caches, `uploads/`, `qdrant_storage/`.
 
 ## Teaching mode (the developer is learning; this is required)
