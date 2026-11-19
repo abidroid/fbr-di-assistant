@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError
 from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
-from app.routes import health
+from app.routes import auth, health
 from app.schemas import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -181,6 +181,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, unhandled_error_handler)
 
     app.include_router(health.router)
+    app.include_router(auth.router)
     return app
 
 
