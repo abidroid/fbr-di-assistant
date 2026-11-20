@@ -1,0 +1,13 @@
+# The "before" number: fixed 512-token windows (overlap 50), dense search only.
+name: baseline
+description: Fixed 512-token chunks, dense only (the before number)
+ingestion:
+  chunking: fixed_512
+  context_header: true
+retrieval:
+  mode: dense
+  rerank: false
+  exact_boost: false
+  authority_boost: false
+metrics:
+  k: 5

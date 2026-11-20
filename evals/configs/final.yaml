@@ -1,0 +1,13 @@
+# The chosen system: hybrid + cross-encoder reranker + exact-token and authority boosts.
+name: final
+description: Structure-aware, hybrid + reranker + boosts (the chosen system)
+ingestion:
+  chunking: structure
+  context_header: true
+retrieval:
+  mode: hybrid
+  rerank: true
+  exact_boost: true
+  authority_boost: true
+metrics:
+  k: 5

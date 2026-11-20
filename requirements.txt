@@ -695,6 +695,7 @@ pyyaml==6.0.3
     #   accelerate
     #   datasets
     #   docling-core
+    #   fbr-di-assistant
     #   huggingface-hub
     #   ir-datasets
     #   jupyter-events

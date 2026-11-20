@@ -1,0 +1,14 @@
+# Changes ONE thing from structure_dense: adds BM25 and RRF fusion.
+# Do exact codes like 0052 need keyword search?
+name: structure_hybrid
+description: Structure-aware chunks, dense + BM25 fused by RRF (do codes need keywords?)
+ingestion:
+  chunking: structure
+  context_header: true
+retrieval:
+  mode: hybrid
+  rerank: false
+  exact_boost: false
+  authority_boost: false
+metrics:
+  k: 5

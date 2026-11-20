@@ -17,6 +17,7 @@ from app.exceptions import InvalidCredentialsError
 from app.ingestion.embed import DenseEmbedder, SparseEmbedder
 from app.ingestion.extract import Extractor
 from app.models import User
+from app.retrieval import Reranker
 from app.services import auth_service
 from app.services.document_service import Pipeline
 
@@ -55,6 +56,14 @@ def get_dense_embedder(request: Request) -> DenseEmbedder:
 def get_sparse_embedder(request: Request) -> SparseEmbedder:
     """Return the sparse embedder (BM25) loaded once in the lifespan."""
     return request.app.state.sparse_embedder
+
+
+def get_reranker(request: Request) -> Reranker:
+    """Return the reranker (bge-reranker-v2-m3) loaded once in the lifespan."""
+    return request.app.state.reranker
+
+
+RerankerDep = Annotated[Reranker, Depends(get_reranker)]
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:

@@ -129,8 +129,38 @@ class Settings(BaseSettings):
     # --- Retrieval ----------------------------------------------------------
     candidates: int = 30  # prefetch size for each of dense and bm25
     top_k: int = 6  # chunks passed to the LLM after reranking
-    # Below this best rerank score we refuse instead of answering (tuned on golden set).
-    refusal_threshold: float = 0.30
+    # Below this best raw rerank score retrieval refuses without calling the LLM.
+    # Tune-split sweep (2026-11-20): answerable and unanswerable scores overlap
+    # (correct answers scored as low as 0.06), so 0.30 refused 24% of answerable
+    # questions. 0.03 only refuses when retrieval finds essentially nothing; the
+    # LLM's "answerable" flag does the finer check. Re-tuned in Phase 6.
+    refusal_threshold: float = 0.03
+    # RRF constant: score = sum of 1 / (k + rank). Qdrant's default is 2, which
+    # lets a single list's rank 1 dominate; 60 (from the original RRF paper)
+    # rewards chunks that rank well in BOTH the dense and the bm25 list.
+    rrf_k: int = 60
+    # Added to the rerank score (0-1) when a chunk contains an exact code from
+    # the question (0052, SN009, 150XF). Large enough to lift a correct row past
+    # a near-tie, small enough not to beat a clearly better passage.
+    exact_token_boost: float = 0.15
+    # Added to the rerank score by source type: when two passages answer the
+    # question about equally well, the binding law should come first.
+    authority_boosts: dict[str, float] = {
+        "law": 0.05,
+        "official_guidance": 0.03,
+        "faq": 0.03,
+        "third_party": 0.0,
+    }
+    # Longest question + passage the reranker reads. Most chunks are under 300
+    # tokens; 1024 covers long rules without the cost of the model's 8192 max.
+    rerank_max_tokens: int = 1024
+    # Pairs scored per model call. A batch is padded to its longest pair, so on
+    # CPU bigger batches only add work: measured on 30 real pairs, batch 1 =
+    # 33 s, batch 8 = 51 s. Use 16-32 on a GPU.
+    rerank_batch_size: int = 1
+    # Fused candidates passed to the reranker (each pair costs ~1 s on CPU).
+    # 15 halves reranking time vs all 30; the eval checks that quality holds.
+    rerank_candidates: int = 15
 
     # --- LLM ----------------------------------------------------------------
     llm_model: str = "claude-sonnet-5-5"
