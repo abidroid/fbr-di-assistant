@@ -53,6 +53,20 @@ class Settings(BaseSettings):
     max_upload_mb: int = 25
     # Larger files return 202 and finish ingesting in a background task.
     sync_ingest_max_pages: int = 150
+    # Zip-bomb limits for DOCX/PPTX (both are zip files): a tiny upload must not
+    # be allowed to expand into gigabytes when it is unpacked.
+    max_unzipped_mb: int = 200
+    max_zip_ratio: int = 100
+
+    # --- Extraction ---------------------------------------------------------
+    # A PDF page with less text than this has no real text layer (a scan or a
+    # screenshot), so it goes to OCR or captioning instead of PyMuPDF.
+    min_text_chars_per_page: int = 50
+    # Share of the page covered by images above which a low-text page is treated
+    # as a screenshot and captioned by the small Claude model.
+    caption_min_image_ratio: float = 0.4
+    # A header/footer line repeated on more than this share of pages is removed.
+    repeated_line_ratio: float = 0.5
 
     # --- Ingestion: embeddings, chunking, Qdrant index ----------------------
     embedder: Literal["local", "api"] = "local"
@@ -65,6 +79,12 @@ class Settings(BaseSettings):
     # The fixed_512 strategy exists only as the evaluation baseline.
     fixed_chunk_size: int = 512
     fixed_chunk_overlap: int = 50
+    # Chunk sizes are in tokens; we measure characters and assume ~4 per token.
+    # Exact counts do not matter (BGE-M3 accepts 8192 tokens) and this keeps the
+    # chunker free of a tokenizer download, so tests stay fast and offline.
+    chars_per_token: int = 4
+    # Texts embedded per model call: bigger is faster but uses more RAM.
+    embed_batch_size: int = 16
     qdrant_collection: str = "fbr_di_final"
     qdrant_timeout_s: int = 10
     hnsw_m: int = 16
