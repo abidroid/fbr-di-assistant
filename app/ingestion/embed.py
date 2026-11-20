@@ -81,6 +81,7 @@ class BGEM3Embedder:
 
         self.dim = settings.embedding_dim
         torch.set_num_threads(settings.embed_threads or os.cpu_count() or 1)
+        _silence_flagembedding_progress()
         # Given only a name, FlagEmbedding downloads the whole repository,
         # including a 2.3 GB ONNX copy we never use. Downloading the PyTorch
         # files ourselves and passing the local folder halves the download.
@@ -249,6 +250,30 @@ def create_embedders() -> tuple[DenseEmbedder, SparseEmbedder]:
     if settings.embedder == "api":
         raise NotImplementedError("EMBEDDER=api is not implemented yet; use EMBEDDER=local.")
     return BGEM3Embedder(), Bm25Embedder()
+
+
+def _silence_flagembedding_progress() -> None:
+    """Stop FlagEmbedding from printing two progress bars on every call.
+
+    It hides its bars only when ``len(texts) < batch_size``; with our batch
+    size of 1 that is never true, so each question asked in /ask would write
+    "pre tokenize" and "Inference Embeddings" bars into the server log. Only
+    the ``tqdm``/``trange`` names inside that one module are replaced, unlike
+    redirecting stderr, which would affect every thread in the process.
+    """
+    from FlagEmbedding.inference.embedder.encoder_only import m3
+    from tqdm import tqdm, trange
+
+    def quiet_tqdm(*args: Any, **kwargs: Any) -> Any:
+        kwargs["disable"] = True
+        return tqdm(*args, **kwargs)
+
+    def quiet_trange(*args: Any, **kwargs: Any) -> Any:
+        kwargs["disable"] = True
+        return trange(*args, **kwargs)
+
+    m3.tqdm = quiet_tqdm  # type: ignore[attr-defined]
+    m3.trange = quiet_trange  # type: ignore[attr-defined]
 
 
 def _normalise(vector: list[float]) -> list[float]:
