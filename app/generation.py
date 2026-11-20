@@ -219,10 +219,14 @@ class LLMCall:
 
 
 class FakeLLM:
-    """Offline `LLM` for tests: returns scripted replies in order.
+    """Offline `LLM` for tests: returns scripted replies.
+
+    Each call takes the first scripted reply that fits it: one of the
+    requested type, or a None / exception (which fit any call). Matching by
+    type keeps tests stable when several calls run concurrently.
 
     Attributes:
-        replies: What the next calls return (a model, None, or an exception to raise).
+        replies: Scripted replies (a model, None, or an exception to raise).
         calls: Every call received, in order.
     """
 
@@ -230,7 +234,7 @@ class FakeLLM:
         """Create the fake.
 
         Args:
-            replies: Scripted replies, consumed one per call.
+            replies: Scripted replies, each used once.
         """
         self.replies: list[BaseModel | Exception | None] = list(replies)
         self.calls: list[LLMCall] = []
@@ -246,19 +250,20 @@ class FakeLLM:
         max_tokens: int,
         fallback: bool = False,
     ) -> SchemaT | None:
-        """Record the call and return the next scripted reply.
+        """Record the call and return the first scripted reply that fits it.
 
         Raises:
-            AssertionError: If no scripted reply is left (an unexpected call).
+            AssertionError: If no scripted reply fits (an unexpected call).
             Exception: A scripted exception, e.g. `UpstreamUnavailableError`.
         """
         self.calls.append(LLMCall(model, system, prompt, schema))
-        assert self.replies, f"FakeLLM got an unexpected call for {schema.__name__}"
-        reply = self.replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        assert reply is None or isinstance(reply, schema), "scripted reply has the wrong type"
-        return reply
+        for index, reply in enumerate(self.replies):
+            if reply is None or isinstance(reply, Exception | schema):
+                del self.replies[index]
+                if isinstance(reply, Exception):
+                    raise reply
+                return reply
+        raise AssertionError(f"FakeLLM has no scripted {schema.__name__} reply")
 
 
 # --- Prompts -----------------------------------------------------------------------

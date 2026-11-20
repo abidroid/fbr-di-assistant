@@ -21,13 +21,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError
+from app.generation import ClaudeLLM
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
 from app.ingestion.store import ensure_collection
 from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
 from app.retrieval import create_reranker
-from app.routes import auth, documents, health
+from app.routes import ask, auth, documents, health
 from app.schemas import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Loading reranker (bge-reranker-v2-m3)...")
     app.state.reranker = await anyio.to_thread.run_sync(create_reranker)
     app.state.extractor = Extractor(ClaudeCaptioner())
+    # One Anthropic client for every /ask request (it pools connections).
+    app.state.llm = ClaudeLLM()
     try:
         await ensure_collection(app.state.qdrant)
     except Exception:
@@ -205,6 +208,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(documents.router)
+    app.include_router(ask.router)
     return app
 
 

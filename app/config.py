@@ -184,7 +184,8 @@ class Settings(BaseSettings):
     # Fixed texts, so the frontend and the evaluation can recognise them exactly.
     refusal_message: str = "I couldn't find this in your documents."
     empty_index_message: str = (
-        "You haven't uploaded any documents yet. Upload a document first, then ask about it."
+        "You don't have any searchable documents yet. Upload a document (or wait until it "
+        "finishes processing), then ask about it."
     )
     legal_disclaimer: str = "This is not legal advice; check the cited rule."
     # Random marker in the system prompt; if it ever appears in an answer, the

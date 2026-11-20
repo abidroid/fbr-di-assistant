@@ -249,3 +249,211 @@ def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
         code: {"model": ErrorResponse, "description": HTTPStatus(code).phrase}
         for code in status_codes
     }
+
+
+# --- Ask ----------------------------------------------------------------------
+
+# Trimmed first, so "   " counts as empty and is rejected with 422.
+Question = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
+class HistoryTurn(BaseModel):
+    """One earlier message of the conversation, sent with a follow-up question.
+
+    Attributes:
+        role: Who wrote it.
+        content: What was said (answers are long, so the cap is higher than a question's).
+    """
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class AskRequest(BaseModel):
+    """Body of POST /ask.
+
+    Attributes:
+        question: 1-1000 characters after trimming spaces.
+        history: Up to the last 6 turns, oldest first; only used to rewrite a
+            follow-up into a standalone question.
+    """
+
+    question: Question
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=6)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"question": "How long can the Commissioner extend the integration date?"},
+                {
+                    "question": "And what happens if I miss it?",
+                    "history": [
+                        {
+                            "role": "user",
+                            "content": "How long can the Commissioner extend the integration date?",
+                        },
+                        {
+                            "role": "assistant",
+                            "content": "Up to 60 days in total, in 15-day steps [1].",
+                        },
+                    ],
+                },
+            ]
+        }
+    )
+
+
+class Citation(BaseModel):
+    """A source of the answer, built by code from the chunk's metadata.
+
+    Attributes:
+        n: The number used as ``[n]`` in the answer.
+        chunk_id: The chunk in the search index.
+        doc_id: The document it belongs to.
+        filename: Document file name.
+        page_start: First page (or slide) of the passage.
+        page_end: Last page of the passage.
+        section_path: Headings above the passage, outermost first.
+    """
+
+    n: int
+    chunk_id: str
+    doc_id: str
+    filename: str
+    page_start: int
+    page_end: int
+    section_path: list[str]
+
+
+class RetrievedChunkOut(BaseModel):
+    """A chunk shown in the "retrieved chunks" panel.
+
+    Attributes:
+        n: Its document number in the prompt.
+        chunk_id: The chunk in the search index.
+        filename: Document file name.
+        page_start: First page of the chunk.
+        section_path: Headings above the chunk.
+        text: The chunk text.
+        similarity: Cosine similarity between question and chunk (-1 to 1).
+        rerank_score: Cross-encoder score (0-1), or null when reranking is off.
+    """
+
+    n: int
+    chunk_id: str
+    filename: str
+    page_start: int
+    section_path: list[str]
+    text: str
+    similarity: float
+    rerank_score: float | None
+
+
+class Timings(BaseModel):
+    """Milliseconds spent in each stage of the request.
+
+    Attributes:
+        guardrails: Input and output checks.
+        retrieval: Follow-up rewrite, query embedding and search.
+        rerank: Cross-encoder reranking and boosts.
+        generation: The answering model call(s) and citation check.
+        total: The whole pipeline.
+    """
+
+    guardrails: float
+    retrieval: float
+    rerank: float
+    generation: float
+    total: float
+
+
+class AskResponse(BaseModel):
+    """Body of a successful POST /ask: an answer with citations, or a refusal.
+
+    Attributes:
+        request_id: Matches the ``X-Request-ID`` header and the log line.
+        answer: The answer with ``[n]`` markers, or the refusal sentence.
+        answerable: False when the documents do not contain the answer.
+        language: ISO 639-1 code of the answer.
+        citations: The sources behind the ``[n]`` markers.
+        general_context: Background from general knowledge; never cited.
+        chunk_count: How many chunks the answer was generated from.
+        retrieved_chunks: Those chunks, best first.
+        timings_ms: Time per stage.
+    """
+
+    request_id: str
+    answer: str
+    answerable: bool
+    language: str
+    citations: list[Citation]
+    general_context: str | None
+    chunk_count: int
+    retrieved_chunks: list[RetrievedChunkOut]
+    timings_ms: Timings
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "request_id": "3f2b9c0e8a7d4e61b1c2d3e4f5a6b7c8",
+                    "answer": (
+                        "Yes. The Commissioner Inland Revenue may extend the integration date "
+                        "for up to 60 days in aggregate, 15 days at a time [1].\n\n"
+                        "This is not legal advice; check the cited rule."
+                    ),
+                    "answerable": True,
+                    "language": "en",
+                    "citations": [
+                        {
+                            "n": 1,
+                            "chunk_id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+                            "doc_id": "5d1f8a2b-3c4e-4f60-8a9b-0c1d2e3f4a5b",
+                            "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+                            "page_start": 108,
+                            "page_end": 108,
+                            "section_path": ["Chapter XIV-H", "150V. Extension of time"],
+                        }
+                    ],
+                    "general_context": None,
+                    "chunk_count": 6,
+                    "retrieved_chunks": [
+                        {
+                            "n": 1,
+                            "chunk_id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+                            "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+                            "page_start": 108,
+                            "section_path": ["Chapter XIV-H", "150V. Extension of time"],
+                            "text": "150V. ... extension ... up to sixty days in aggregate.",
+                            "similarity": 0.71,
+                            "rerank_score": 0.93,
+                        }
+                    ],
+                    "timings_ms": {
+                        "guardrails": 0.4,
+                        "retrieval": 820.5,
+                        "rerank": 14250.0,
+                        "generation": 3900.2,
+                        "total": 18971.1,
+                    },
+                },
+                {
+                    "request_id": "9a8b7c6d5e4f4a3b8c2d1e0f9a8b7c6d",
+                    "answer": "I couldn't find this in your documents.",
+                    "answerable": False,
+                    "language": "en",
+                    "citations": [],
+                    "general_context": None,
+                    "chunk_count": 0,
+                    "retrieved_chunks": [],
+                    "timings_ms": {
+                        "guardrails": 0.3,
+                        "retrieval": 790.0,
+                        "rerank": 0.0,
+                        "generation": 0.0,
+                        "total": 790.3,
+                    },
+                },
+            ]
+        }
+    )
