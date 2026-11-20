@@ -133,7 +133,10 @@ class Settings(BaseSettings):
     # Tune-split sweep (2026-11-20): answerable and unanswerable scores overlap
     # (correct answers scored as low as 0.06), so 0.30 refused 24% of answerable
     # questions. 0.03 only refuses when retrieval finds essentially nothing; the
-    # LLM's "answerable" flag does the finer check. Re-tuned in Phase 6.
+    # LLM's "answerable" flag does the finer check. Confirmed in Phase 6 on real
+    # answers (evals/results/2026-11-20_final_full.md): at 0.03 the model already
+    # refused 5/5 unanswerable questions with 4% false refusals; 0.10 would add
+    # 12 points of false refusals and catch no extra unanswerable question.
     refusal_threshold: float = 0.03
     # RRF constant: score = sum of 1 / (k + rank). Qdrant's default is 2, which
     # lets a single list's rank 1 dominate; 60 (from the original RRF paper)
