@@ -221,13 +221,20 @@ async def _prepare(
     return chunks, meta
 
 
-async def embed_and_store(chunks: list[Chunk], meta: DocumentMeta, pipeline: Pipeline) -> int:
+async def embed_and_store(
+    chunks: list[Chunk],
+    meta: DocumentMeta,
+    pipeline: Pipeline,
+    collection: str | None = None,
+) -> int:
     """Embed chunks (dense and sparse at the same time) and write them to Qdrant.
 
     Args:
         chunks: The document's chunks.
         meta: Payload facts about the document.
         pipeline: Embedders and Qdrant client.
+        collection: Target collection; defaults to ``settings.qdrant_collection``.
+            The evaluation runner passes its own per-config collection.
 
     Returns:
         Number of points stored.
@@ -237,8 +244,8 @@ async def embed_and_store(chunks: list[Chunk], meta: DocumentMeta, pipeline: Pip
     dense, sparse = await asyncio.gather(
         pipeline.dense.embed_documents(texts), pipeline.sparse.embed_documents(texts)
     )
-    await ensure_collection(pipeline.qdrant)
-    return await upsert_chunks(pipeline.qdrant, chunks, dense, sparse, meta)
+    await ensure_collection(pipeline.qdrant, collection)
+    return await upsert_chunks(pipeline.qdrant, chunks, dense, sparse, meta, collection)
 
 
 async def finish_in_background(

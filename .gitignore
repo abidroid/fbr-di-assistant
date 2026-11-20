@@ -30,3 +30,6 @@ qdrant_storage/
 # Frontend
 node_modules/
 frontend/dist/
+
+# Evaluation extraction cache (OCR + paid captions, rebuilt on demand)
+evals/cache/

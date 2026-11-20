@@ -99,3 +99,36 @@ uv run pytest tests/unit -v
 
 `test_golden_set.py` checks the 50 / 30 / 20 counts, the per-category split, and that every
 source file is an indexed, current entry in `corpus/manifest.jsonl` with pages in range.
+
+## Running the retrieval evaluation
+
+Qdrant must be running (`docker compose up -d qdrant`). Then:
+
+```powershell
+uv run python -m evals.run_eval --config final               # one config, tune split
+uv run python -m evals.run_eval --config all --split tune    # all four + comparison table
+uv run python -m evals.run_eval --config final --split heldout   # final report only
+```
+
+| Config (`evals/configs/`) | Chunking | Retrieval | Question it answers |
+| --- | --- | --- | --- |
+| `baseline` | fixed_512 | dense | The "before" number |
+| `structure_dense` | structure | dense | Does chunking help? |
+| `structure_hybrid` | structure | dense + BM25, RRF | Do exact codes need keywords? |
+| `final` | structure | hybrid + reranker + boosts | The chosen system |
+
+- **Ingestion is shared and cached.** The collection name is a hash of the ingestion
+  settings, models and manifest (`eval_<chunking>_<hash8>`), so the three structure
+  configs search one collection. The first run embeds the whole corpus (about 40 min on
+  CPU for structure, less for fixed_512); later runs skip documents that are complete.
+  Extraction results (OCR, paid screenshot captions) are cached in `evals/cache/`
+  (git-ignored). After changing chunker or extractor code, pass `--reingest` (and delete
+  `evals/cache/` if extraction changed).
+- **What is ingested:** every manifest row with `index: true`, plus the superseded
+  versions stored with `superseded=true`, so the version-sensitive questions prove the
+  filter keeps them out. All eval chunks belong to one fixed eval owner id.
+- **Output:** `evals/results/<date>_<config>.json` (every question, every retrieved chunk
+  with cosine, rerank score and hit flag) and `.md` (overall, per category, misses, and a
+  refusal-threshold sweep for reranking configs), plus `<date>_retrieval_comparison.md`
+  when several configs run.
+- **Never tune on `heldout`.** `--split` defaults to `tune`.
