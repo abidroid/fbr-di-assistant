@@ -102,10 +102,21 @@ class Settings(BaseSettings):
     # A JSON sample stays whole up to this size (it is only useful complete);
     # bigger ones are split like normal text. BGE-M3 reads up to 8192 tokens.
     max_json_chunk_tokens: int = 2000
-    # Texts embedded per model call: bigger is faster but uses more RAM.
-    embed_batch_size: int = 16
+    # Longest text BGE-M3 reads per chunk. The library default (512) would
+    # silently cut off long JSON samples and rules; 2048 covers our largest
+    # chunks (2000-token JSON) plus the context header.
+    embed_max_tokens: int = 2048
+    # Texts the model processes together. Measured on CPU (8 threads): batch 1
+    # = 0.99 s/chunk, 4 = 1.41 s, 8 = 1.88 s; a batch is padded to its longest
+    # text and a CPU gains nothing from parallel rows. Use 16-32 on a GPU.
+    embed_batch_size: int = 1
+    # CPU threads for the embedding model; 0 = all cores. torch's default uses
+    # half the logical cores, measured 1.9x slower here.
+    embed_threads: int = 0
     qdrant_collection: str = "fbr_di_final"
     qdrant_timeout_s: int = 10
+    # Attempts per Qdrant call (first try + retries) before answering 503.
+    qdrant_max_retries: int = 3
     hnsw_m: int = 16
     hnsw_ef_construct: int = 100
 

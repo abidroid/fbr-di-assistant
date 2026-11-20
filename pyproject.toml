@@ -65,3 +65,7 @@ asyncio_default_fixture_loop_scope = "session"
 # Tests share the fixtures' event loop: database connections belong to the loop
 # that opened them and fail if used from another one.
 asyncio_default_test_loop_scope = "session"
+filterwarnings = [
+    # In-memory Qdrant ignores payload indexes; the real server uses them.
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+]
