@@ -131,6 +131,29 @@ class Settings(BaseSettings):
     top_k: int = 6  # chunks passed to the LLM after reranking
     # Below this best rerank score we refuse instead of answering (tuned on golden set).
     refusal_threshold: float = 0.30
+    # RRF constant: score = sum of 1 / (k + rank). Qdrant's default is 2, which
+    # lets a single list's rank 1 dominate; 60 (from the original RRF paper)
+    # rewards chunks that rank well in BOTH the dense and the bm25 list.
+    rrf_k: int = 60
+    # Added to the rerank score (0-1) when a chunk contains an exact code from
+    # the question (0052, SN009, 150XF). Large enough to lift a correct row past
+    # a near-tie, small enough not to beat a clearly better passage.
+    exact_token_boost: float = 0.15
+    # Added to the rerank score by source type: when two passages answer the
+    # question about equally well, the binding law should come first.
+    authority_boosts: dict[str, float] = {
+        "law": 0.05,
+        "official_guidance": 0.03,
+        "faq": 0.03,
+        "third_party": 0.0,
+    }
+    # Longest question + passage the reranker reads. Most chunks are under 300
+    # tokens; 1024 covers long rules without the cost of the model's 8192 max.
+    rerank_max_tokens: int = 1024
+    # Pairs scored per model call. A batch is padded to its longest pair, so on
+    # CPU large batches waste work (as measured for embed_batch_size); 8 is a
+    # starting point, timed in notebooks/04_retrieve.
+    rerank_batch_size: int = 8
 
     # --- LLM ----------------------------------------------------------------
     llm_model: str = "claude-sonnet-5-5"

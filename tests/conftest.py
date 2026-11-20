@@ -35,6 +35,7 @@ from app.deps import (  # noqa: E402
     get_dense_embedder,
     get_extractor,
     get_qdrant,
+    get_reranker,
     get_session_factory,
     get_sparse_embedder,
 )
@@ -42,6 +43,7 @@ from app.ingestion.caption import FakeCaptioner  # noqa: E402
 from app.ingestion.embed import FakeEmbedder, FakeSparseEmbedder  # noqa: E402
 from app.ingestion.extract import Extractor  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.retrieval import FakeReranker  # noqa: E402
 
 TEST_PASSWORD = "a-long-secret-phrase"
 
@@ -183,6 +185,7 @@ async def db_client(
     application.dependency_overrides[get_extractor] = lambda: Extractor(captioner)
     application.dependency_overrides[get_dense_embedder] = lambda: fake_dense
     application.dependency_overrides[get_sparse_embedder] = FakeSparseEmbedder
+    application.dependency_overrides[get_reranker] = FakeReranker
     application.dependency_overrides[get_session_factory] = lambda: db_sessionmaker
     transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:

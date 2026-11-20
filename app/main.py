@@ -26,6 +26,7 @@ from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
 from app.ingestion.store import ensure_collection
 from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
+from app.retrieval import create_reranker
 from app.routes import auth, documents, health
 from app.schemas import ErrorDetail, ErrorResponse
 
@@ -54,6 +55,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.dense_embedder, app.state.sparse_embedder = await anyio.to_thread.run_sync(
         create_embedders
     )
+    logger.info("Loading reranker (bge-reranker-v2-m3)...")
+    app.state.reranker = await anyio.to_thread.run_sync(create_reranker)
     app.state.extractor = Extractor(ClaudeCaptioner())
     try:
         await ensure_collection(app.state.qdrant)
