@@ -51,8 +51,14 @@ class Settings(BaseSettings):
     # --- Files and upload limits --------------------------------------------
     upload_dir: str = "uploads"
     max_upload_mb: int = 25
-    # Larger files return 202 and finish ingesting in a background task.
-    sync_ingest_max_pages: int = 150
+    # Uploads with more chunks return 202 and are embedded in a background
+    # task. Embedding costs ~1 s per chunk on CPU, so 120 keeps a 201 upload
+    # around two minutes. Chunks, not pages: the 51-page API spec makes 524
+    # chunks while the 11-page SRO 69 makes 26.
+    sync_ingest_max_chunks: int = 120
+    # Known corpus files (matched by sha256) get their title, authority and
+    # version date from here; other uploads count as third-party documents.
+    corpus_manifest_path: str = "corpus/manifest.jsonl"
     # Zip-bomb limits for DOCX/PPTX (both are zip files): a tiny upload must not
     # be allowed to expand into gigabytes when it is unpacked.
     max_unzipped_mb: int = 200

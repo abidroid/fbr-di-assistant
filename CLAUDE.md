@@ -129,9 +129,11 @@ keep those names exactly so the grader finds them, and explain the extra modules
 | POST | /ask | token | 200 | 400 blocked by guardrail, 401, 422, 429, 503 |
 | GET | /health | public | 200 / 503 | — |
 
-- 201 on upload means ingestion finished (the brief: "uploaded and ingested"). Files above
-  `SYNC_INGEST_MAX_PAGES` (default 150) return 202 with status `processing` and are finished by a
-  background task; the frontend polls GET /documents/{id}.
+- 201 on upload means ingestion finished (the brief: "uploaded and ingested"). Validation,
+  extraction and chunking always run in the request; files with more than
+  `SYNC_INGEST_MAX_CHUNKS` chunks (default 120, ~2 min of CPU embedding) return 202 with status
+  `processing` and are embedded by a background task; the frontend polls GET /documents/{id}.
+  Chunks, not pages, because embedding cost follows chunk count (measured ~1 s/chunk on CPU).
 - Another user's document id returns 404 (never reveal it exists).
 - AskRequest: question (1-1000 chars after strip), optional history (last 6 turns).
 - AskResponse: request_id, answer, answerable (bool), language, citations[{n, chunk_id, doc_id,

@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 
+import anyio
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,8 +21,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError
+from app.ingestion.caption import ClaudeCaptioner
+from app.ingestion.embed import create_embedders
+from app.ingestion.extract import Extractor
+from app.ingestion.store import ensure_collection
 from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
-from app.routes import auth, health
+from app.routes import auth, documents, health
 from app.schemas import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -43,6 +48,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.qdrant = AsyncQdrantClient(
         url=settings.qdrant_url, api_key=api_key, timeout=settings.qdrant_timeout_s
     )
+    # Heavy models load once here, not per request: BGE-M3 takes ~25 s and
+    # ~2 GB of RAM. Loading runs in a thread so startup logs keep flowing.
+    logger.info("Loading embedding models (BGE-M3 dense, BM25 sparse)...")
+    app.state.dense_embedder, app.state.sparse_embedder = await anyio.to_thread.run_sync(
+        create_embedders
+    )
+    app.state.extractor = Extractor(ClaudeCaptioner())
+    try:
+        await ensure_collection(app.state.qdrant)
+    except Exception:
+        # Qdrant may still be starting; /health reports it, and the first
+        # upload creates the collection anyway.
+        logger.warning("Could not prepare the Qdrant collection at startup", exc_info=True)
+    logger.info("Startup complete")
     try:
         yield
     finally:
@@ -182,6 +201,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(documents.router)
     return app
 
 

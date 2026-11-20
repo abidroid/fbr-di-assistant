@@ -103,7 +103,12 @@ class DuplicateDocumentError(DomainError):
             existing_id: Id of the previously uploaded identical document.
         """
         self.existing_id = existing_id
-        super().__init__(f"This file was already uploaded as document {existing_id}.")
+        # Location tells the client where the existing document lives, the
+        # standard way to point at it without changing the error body shape.
+        super().__init__(
+            f"This file was already uploaded as document {existing_id}.",
+            headers={"Location": f"/documents/{existing_id}"},
+        )
 
 
 class FileTooLargeError(DomainError):
