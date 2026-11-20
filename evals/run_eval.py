@@ -27,6 +27,7 @@ from pathlib import Path
 from qdrant_client import AsyncQdrantClient
 
 from app.config import settings
+from app.exceptions import UpstreamUnavailableError
 from app.generation import LLM, ClaudeLLM
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
@@ -36,6 +37,7 @@ from app.services.ask_service import answer_question
 from app.services.document_service import Pipeline
 from evals.answer_report import (
     AnswerResult,
+    answer_result_from_dict,
     answer_threshold_sweep,
     answers_markdown,
     summarise_answers,
@@ -56,6 +58,11 @@ from evals.report import (
 )
 
 RESULTS_DIR = Path(__file__).parent / "results"
+# A full run makes paid API calls for ~30 minutes; if the network drops, the
+# questions already graded are kept here and skipped on the next run.
+CHECKPOINT_SUFFIX = "_full.checkpoint.jsonl"
+# One pause-and-retry per question rides out a short network outage.
+OUTAGE_PAUSE_S = 30
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -194,68 +201,121 @@ async def evaluate_retrieval(
 
 
 async def evaluate_full(
-    config: EvalConfig, questions: list[GoldenQuestion], retrievers: Retrievers, llm: LLM
+    config: EvalConfig,
+    questions: list[GoldenQuestion],
+    retrievers: Retrievers,
+    llm: LLM,
+    checkpoint: Path,
 ) -> list[AnswerResult]:
     """Answer every question with the real pipeline and grade each answer.
+
+    Each graded question is appended to ``checkpoint`` straight away, and
+    questions already in it are not asked again, so a crash halfway costs
+    only the question it happened on.
 
     Args:
         config: The config being evaluated.
         questions: Golden questions.
         retrievers: Embedders, reranker and Qdrant client.
         llm: Model client for answering and judging.
+        checkpoint: JSONL file of results graded so far.
 
     Returns:
-        One result per question.
+        One result per question, in golden-set order.
     """
-    retrieval = config.retrieval.to_config()
-    collection = config.collection_name()
-    results = []
+    done = load_checkpoint(checkpoint)
+    if done:
+        print(f"  resuming: {len(done)} questions already graded in {checkpoint.name}")
     for number, question in enumerate(questions, start=1):
-        outcome = await answer_question(
-            question.question,
-            [],
-            EVAL_OWNER_ID,
-            retrievers,
-            llm,
-            config=retrieval,
-            collection=collection,
-        )
-        assert outcome.retrieval is not None  # retrieval always runs without an empty-index check
-        response = outcome.response
-        contexts = [chunk.text for chunk in outcome.retrieval.chunks]
-        score = await score_answer(
-            question=question.question,
-            expected_answerable=question.answerable,
-            reference=question.reference_answer,
-            answer=response.answer,
-            refused=not response.answerable,
-            contexts=contexts,
-            cited=cited_texts(response.answer, contexts),
-            llm=llm,
-        )
-        generation = outcome.generation
-        results.append(
-            AnswerResult(
-                retrieval=to_result(question, outcome.retrieval, config.metrics.k),
-                reference=question.reference_answer,
-                standalone_question=outcome.standalone_question,
-                answer=response.answer,
-                refused=not response.answerable,
-                refusal_reason=generation.refusal_reason if generation else "below_threshold",
-                citations=[f"{c.filename} p.{c.page_start}" for c in response.citations],
-                faithfulness=score.faithfulness,
-                correctness=score.correctness,
-                verdict=score.verdict,
-                verdict_reason=score.reason,
-                citations_supported=score.citations_supported,
-                unsupported_claims=score.unsupported_claims,
-                generation_ms=response.timings_ms.generation,
-                total_ms=response.timings_ms.total,
-            )
-        )
-        progress = f"[{number:2}/{len(questions)}] {score.verdict:7} {question.id}"
+        if question.id in done:
+            continue
+        try:
+            result = await answer_and_grade(config, question, retrievers, llm)
+        except UpstreamUnavailableError:
+            print(f"  API unreachable; retrying {question.id} in {OUTAGE_PAUSE_S} s")
+            await asyncio.sleep(OUTAGE_PAUSE_S)
+            result = await answer_and_grade(config, question, retrievers, llm)
+        done[question.id] = result
+        with checkpoint.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(asdict(result)) + "\n")
+        progress = f"[{number:2}/{len(questions)}] {result.verdict:7} {question.id}"
         print(f"  {progress} {question.question[:55]}")
-    return results
+    return [done[question.id] for question in questions]
+
+
+def load_checkpoint(path: Path) -> dict[str, AnswerResult]:
+    """Read the results graded so far.
+
+    Args:
+        path: The checkpoint file (may not exist).
+
+    Returns:
+        Results by question id.
+    """
+    if not path.exists():
+        return {}
+    results = [
+        answer_result_from_dict(json.loads(line))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return {result.retrieval.id: result for result in results}
+
+
+async def answer_and_grade(
+    config: EvalConfig, question: GoldenQuestion, retrievers: Retrievers, llm: LLM
+) -> AnswerResult:
+    """Answer one golden question with the real pipeline, then grade it.
+
+    Args:
+        config: The config being evaluated.
+        question: The golden question.
+        retrievers: Embedders, reranker and Qdrant client.
+        llm: Model client for answering and judging.
+
+    Returns:
+        The question's full result.
+    """
+    outcome = await answer_question(
+        question.question,
+        [],
+        EVAL_OWNER_ID,
+        retrievers,
+        llm,
+        config=config.retrieval.to_config(),
+        collection=config.collection_name(),
+    )
+    assert outcome.retrieval is not None  # retrieval always runs without an empty-index check
+    response = outcome.response
+    contexts = [chunk.text for chunk in outcome.retrieval.chunks]
+    score = await score_answer(
+        question=question.question,
+        expected_answerable=question.answerable,
+        reference=question.reference_answer,
+        answer=response.answer,
+        refused=not response.answerable,
+        contexts=contexts,
+        cited=cited_texts(response.answer, contexts),
+        llm=llm,
+    )
+    generation = outcome.generation
+    return AnswerResult(
+        retrieval=to_result(question, outcome.retrieval, config.metrics.k),
+        reference=question.reference_answer,
+        standalone_question=outcome.standalone_question,
+        answer=response.answer,
+        refused=not response.answerable,
+        refusal_reason=generation.refusal_reason if generation else "below_threshold",
+        citations=[f"{c.filename} p.{c.page_start}" for c in response.citations],
+        faithfulness=score.faithfulness,
+        correctness=score.correctness,
+        verdict=score.verdict,
+        verdict_reason=score.reason,
+        citations_supported=score.citations_supported,
+        unsupported_claims=score.unsupported_claims,
+        generation_ms=response.timings_ms.generation,
+        total_ms=response.timings_ms.total,
+    )
 
 
 def write_full_report(
@@ -392,8 +452,11 @@ async def main(argv: list[str] | None = None) -> None:
             llm = ClaudeLLM()
             for config in configs:
                 print(f"Answering and judging {config.name}")
-                answers = await evaluate_full(config, questions, retrievers, llm)
+                checkpoint = RESULTS_DIR / f"{config.name}_{args.split}{CHECKPOINT_SUFFIX}"
+                answers = await evaluate_full(config, questions, retrievers, llm, checkpoint)
                 answer_summary = write_full_report(config, args.split, answers, stamp)
+                # The report now holds everything; a new run starts fresh.
+                checkpoint.unlink()
                 print(f"  -> {answer_summary['overall']}")
             return
 

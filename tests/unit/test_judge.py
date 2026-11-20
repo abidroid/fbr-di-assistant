@@ -1,10 +1,17 @@
 """Unit tests for evals.judge and evals.answer_report (no real model)."""
 
+from dataclasses import asdict
+
 import pytest
 
 from app.config import settings
 from app.generation import FakeLLM
-from evals.answer_report import AnswerResult, answer_threshold_sweep, summarise_answers
+from evals.answer_report import (
+    AnswerResult,
+    answer_result_from_dict,
+    answer_threshold_sweep,
+    summarise_answers,
+)
 from evals.judge import (
     ClaimCheck,
     ClaimChecks,
@@ -18,7 +25,7 @@ from evals.judge import (
     strip_for_grading,
 )
 from evals.judge_check import agreement, cohen_kappa, select_sample
-from evals.report import QuestionResult
+from evals.report import QuestionResult, RetrievedRow
 
 
 def test_faithfulness_is_the_share_of_supported_claims() -> None:
@@ -163,3 +170,11 @@ def test_sample_covers_every_verdict_and_is_reproducible() -> None:
     assert len(sample) == 10
     assert {q["verdict"] for q in sample} == {"correct", "partly", "wrong"}
     assert sample == select_sample(questions, size=10)
+
+
+def test_checkpoint_round_trip_restores_the_nested_result() -> None:
+    original = make_result("q1", True, False, 0.9, "correct")
+    original.retrieval.retrieved = [
+        RetrievedRow(1, "f.pdf", 3, 3, "Rules > 150V", 0.7, 0.9, 0.95, False, True)
+    ]
+    assert answer_result_from_dict(asdict(original)) == original

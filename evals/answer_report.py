@@ -9,7 +9,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 from evals.metrics import mean_ignoring_none
-from evals.report import QuestionResult, _fmt
+from evals.report import QuestionResult, RetrievedRow, _fmt
 
 # Thresholds tried for REFUSAL_THRESHOLD on the real answer outcomes.
 FULL_SWEEP = [0.0, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
@@ -52,6 +52,21 @@ class AnswerResult:
     unsupported_claims: list[str] = field(default_factory=list)
     generation_ms: float = 0.0
     total_ms: float = 0.0
+
+
+def answer_result_from_dict(data: dict[str, object]) -> AnswerResult:
+    """Rebuild an `AnswerResult` saved with ``dataclasses.asdict`` (checkpoint files).
+
+    Args:
+        data: The saved dict.
+
+    Returns:
+        The result, with its nested retrieval result and rows restored.
+    """
+    fields = dict(data)
+    retrieval = dict(fields.pop("retrieval"))  # type: ignore[call-overload]
+    rows = [RetrievedRow(**row) for row in retrieval.pop("retrieved")]
+    return AnswerResult(retrieval=QuestionResult(**retrieval, retrieved=rows), **fields)  # type: ignore[arg-type]
 
 
 def summarise_answers(results: Sequence[AnswerResult]) -> dict[str, object]:
