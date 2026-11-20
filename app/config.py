@@ -67,6 +67,19 @@ class Settings(BaseSettings):
     caption_min_image_ratio: float = 0.4
     # A header/footer line repeated on more than this share of pages is removed.
     repeated_line_ratio: float = 0.5
+    # Running headers/footers sit in the top/bottom 8% of a PDF page.
+    pdf_margin_ratio: float = 0.08
+    # Text this much bigger than the body font is a heading (14 pt vs 12 pt body).
+    heading_size_ratio: float = 1.1
+    # Text at most this share of the body font is a footnote or a footnote
+    # marker (8 pt notes, 5-9 pt superscript numbers vs 12 pt body).
+    small_font_ratio: float = 0.8
+    # Captions run in parallel, but at most this many at once, to stay well
+    # under the API rate limit.
+    caption_concurrency: int = 4
+    # Longest side of the PNG sent for captioning; about what the model reads
+    # without downscaling, and small enough to keep image tokens cheap.
+    caption_image_px: int = 1500
 
     # --- Ingestion: embeddings, chunking, Qdrant index ----------------------
     embedder: Literal["local", "api"] = "local"
