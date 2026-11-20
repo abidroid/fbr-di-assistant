@@ -1,0 +1,49 @@
+# Retrieval eval: `final` with rerank of all 30 candidates, batch 8, threshold 0.30 (first run, kept for comparison)
+
+Structure-aware, hybrid + reranker + boosts (the chosen system). Split `tune`, collection `eval_structure_3fa86c58`, k = 5.
+
+| Metric | Value |
+| --- | --- |
+| hit rate@5 | 0.920 |
+| recall@5 | 0.880 |
+| MRR | 0.747 |
+| answerable questions | 25 |
+| latency p50 / p95 (ms) | 60955 / 77949 |
+
+## Per category
+
+| Category | n | hit@5 | recall@5 | MRR |
+| --- | --- | --- | --- | --- |
+| exact_code | 4 | 1.000 | 1.000 | 0.875 |
+| field_rule | 4 | 0.750 | 0.750 | 0.625 |
+| legal_rule | 4 | 0.750 | 0.750 | 0.500 |
+| multi_part | 3 | 1.000 | 1.000 | 1.000 |
+| reworded_faq | 3 | 1.000 | 0.667 | 0.778 |
+| screenshot | 2 | 1.000 | 1.000 | 1.000 |
+| table_matrix | 3 | 1.000 | 1.000 | 0.667 |
+| unanswerable | 5 | - | - | - |
+| version_sensitive | 2 | 1.000 | 1.000 | 0.667 |
+
+## Refusal threshold sweep (best raw rerank score)
+
+| Threshold | Answerable refused (bad) | Unanswerable refused (good) |
+| --- | --- | --- |
+| 0.05 | 0% | 20% |
+| 0.10 | 12% | 40% |
+| 0.15 | 16% | 80% |
+| 0.20 | 24% | 80% |
+| 0.25 | 24% | 80% |
+| 0.30 | 24% | 80% |
+| 0.35 | 28% | 100% |
+| 0.40 | 28% | 100% |
+| 0.45 | 32% | 100% |
+| 0.50 | 32% | 100% |
+| 0.55 | 32% | 100% |
+| 0.60 | 36% | 100% |
+
+## Misses (no labelled source in the top 5)
+
+- **q012** (field_rule) How can my ERP find out which unit of measure is allowed for a given HS code?  
+  expected di_api_technical_spec_v1.12.pdf p.31; top-1 was di_api_technical_spec_v1.12.pdf p.45 (8. Purchase Error Codes)
+- **q018** (legal_rule) Who pays for integrating our POS/ERP with FBR?  
+  expected sales_tax_rules_2006_upto_2026-07-31.pdf p.107,110; top-1 was faqs.jsonl p.6 (FAQ 6)

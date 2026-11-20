@@ -1,0 +1,2785 @@
+{
+  "config": {
+    "name": "baseline",
+    "description": "Fixed 512-token chunks, dense only (the before number)",
+    "ingestion": {
+      "chunking": "fixed_512",
+      "context_header": true
+    },
+    "retrieval": {
+      "mode": "dense",
+      "rerank": false,
+      "rerank_candidates": 15,
+      "exact_boost": false,
+      "authority_boost": false,
+      "candidates": 30,
+      "top_k": 6
+    },
+    "metrics": {
+      "k": 5
+    }
+  },
+  "collection": "eval_fixed_512_abb573ae",
+  "split": "tune",
+  "date": "2026-11-20",
+  "settings": {
+    "candidates": 30,
+    "top_k": 6,
+    "rrf_k": 60,
+    "refusal_threshold": 0.03,
+    "exact_token_boost": 0.15,
+    "authority_boosts": {
+      "law": 0.05,
+      "official_guidance": 0.03,
+      "faq": 0.03,
+      "third_party": 0.0
+    }
+  },
+  "summary": {
+    "overall": {
+      "questions": 30,
+      "answerable": 25,
+      "hit_rate": 0.72,
+      "recall": 0.66,
+      "mrr": 0.4506666666666667
+    },
+    "per_category": {
+      "exact_code": {
+        "questions": 4,
+        "answerable": 4,
+        "hit_rate": 0.75,
+        "recall": 0.75,
+        "mrr": 0.625
+      },
+      "field_rule": {
+        "questions": 4,
+        "answerable": 4,
+        "hit_rate": 0.5,
+        "recall": 0.5,
+        "mrr": 0.375
+      },
+      "legal_rule": {
+        "questions": 4,
+        "answerable": 4,
+        "hit_rate": 0.5,
+        "recall": 0.5,
+        "mrr": 0.375
+      },
+      "multi_part": {
+        "questions": 3,
+        "answerable": 3,
+        "hit_rate": 0.6666666666666666,
+        "recall": 0.6666666666666666,
+        "mrr": 0.4444444444444444
+      },
+      "reworded_faq": {
+        "questions": 3,
+        "answerable": 3,
+        "hit_rate": 1.0,
+        "recall": 0.6666666666666666,
+        "mrr": 0.3
+      },
+      "screenshot": {
+        "questions": 2,
+        "answerable": 2,
+        "hit_rate": 0.5,
+        "recall": 0.5,
+        "mrr": 0.1
+      },
+      "table_matrix": {
+        "questions": 3,
+        "answerable": 3,
+        "hit_rate": 1.0,
+        "recall": 1.0,
+        "mrr": 0.8333333333333334
+      },
+      "unanswerable": {
+        "questions": 5,
+        "answerable": 0,
+        "hit_rate": null,
+        "recall": null,
+        "mrr": null
+      },
+      "version_sensitive": {
+        "questions": 2,
+        "answerable": 2,
+        "hit_rate": 1.0,
+        "recall": 0.75,
+        "mrr": 0.41666666666666663
+      }
+    },
+    "latency_ms": {
+      "p50": 431.0,
+      "p95": 635.245
+    }
+  },
+  "threshold_sweep": [],
+  "questions": [
+    {
+      "id": "q001",
+      "category": "exact_code",
+      "answerable": true,
+      "question": "Our ERP got error 0052 back from postinvoicedata. What's wrong with the invoice?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.38"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 583.6,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 11,
+          "page_end": 14,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.2. Sample JSON Data (For Production):",
+          "similarity": 0.5897,
+          "rerank_score": null,
+          "score": 0.5897,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 14,
+          "page_end": 17,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.5. Sample JSON Invalid Response 2:",
+          "similarity": 0.5891,
+          "rerank_score": null,
+          "score": 0.5891,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 19,
+          "page_end": 22,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.2. Sample JSON Data (For Production):",
+          "similarity": 0.5806,
+          "rerank_score": null,
+          "score": 0.5806,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 14,
+          "page_end": 16,
+          "section": "5. Invoice Dashboard > 5.1. Reattempting Invoice Submission After Connection Loss",
+          "similarity": 0.5803,
+          "rerank_score": null,
+          "score": 0.5803,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 36,
+          "page_end": 37,
+          "section": "6. Digital Invoicing Logo & QR Code Printing > Use FBR Digital Invoicing System image to print on receipts",
+          "similarity": 0.5779,
+          "rerank_score": null,
+          "score": 0.5779,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 37,
+          "page_end": 38,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5763,
+          "rerank_score": null,
+          "score": 0.5763,
+          "exact_match": false,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "id": "q002",
+      "category": "exact_code",
+      "answerable": true,
+      "question": "What does validation error 0401 mean and what usually causes it?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.41"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 382.2,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 40,
+          "page_end": 42,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5469,
+          "rerank_score": null,
+          "score": 0.5469,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 46,
+          "page_end": 47,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5431,
+          "rerank_score": null,
+          "score": 0.5431,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 14,
+          "page_end": 17,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.5. Sample JSON Invalid Response 2:",
+          "similarity": 0.5247,
+          "rerank_score": null,
+          "score": 0.5247,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 40,
+          "page_end": 41,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5174,
+          "rerank_score": null,
+          "score": 0.5174,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 19,
+          "page_end": 22,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.2. Sample JSON Data (For Production):",
+          "similarity": 0.511,
+          "rerank_score": null,
+          "score": 0.511,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 44,
+          "page_end": 45,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5099,
+          "rerank_score": null,
+          "score": 0.5099,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q003",
+      "category": "exact_code",
+      "answerable": true,
+      "question": "Which sandbox scenario ID tests a cotton spinner buying from a cotton ginner, and which sale type goes with it?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.46"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 465.2,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 45,
+          "page_end": 46,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5331,
+          "rerank_score": null,
+          "score": 0.5331,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 47,
+          "page_end": 48,
+          "section": "9. Scenarios for Sandbox Testing",
+          "similarity": 0.5286,
+          "rerank_score": null,
+          "score": 0.5286,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 20,
+          "page_end": 21,
+          "section": "14. What happens after Sandbox access is granted?",
+          "similarity": 0.5138,
+          "rerank_score": null,
+          "score": 0.5138,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 45,
+          "page_end": 46,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.4628,
+          "rerank_score": null,
+          "score": 0.4628,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 10,
+          "page_end": 11,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.2. Sample JSON Data (For Production):",
+          "similarity": 0.4557,
+          "rerank_score": null,
+          "score": 0.4557,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.2. Sample JSON Data (For Production):",
+          "similarity": 0.4478,
+          "rerank_score": null,
+          "score": 0.4478,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q004",
+      "category": "exact_code",
+      "answerable": true,
+      "question": "I'm getting error 0034 on a credit note. What time limit am I breaking?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.37"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 489.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 43,
+          "page_end": 44,
+          "section": "CHAPTER III CREDIT AND DEBIT NOTE AND DESTRUCTION OFGOODS",
+          "similarity": 0.5322,
+          "rerank_score": null,
+          "score": 0.5322,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 37,
+          "page_end": 38,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5254,
+          "rerank_score": null,
+          "score": 0.5254,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 44,
+          "page_end": 45,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5181,
+          "rerank_score": null,
+          "score": 0.5181,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 43,
+          "page_end": 43,
+          "section": "CHAPTER III CREDIT AND DEBIT NOTE AND DESTRUCTION OFGOODS",
+          "similarity": 0.517,
+          "rerank_score": null,
+          "score": 0.517,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 39,
+          "page_end": 40,
+          "section": "CHAPTER II FILING OF RETURNS",
+          "similarity": 0.5168,
+          "rerank_score": null,
+          "score": 0.5168,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 37,
+          "page_end": 38,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5116,
+          "rerank_score": null,
+          "score": 0.5116,
+          "exact_match": false,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "id": "q008",
+      "category": "field_rule",
+      "answerable": true,
+      "question": "Is buyerNTNCNIC mandatory when the buyer is unregistered?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.10"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 491.4,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 172,
+          "page_end": 174,
+          "section": "STR-1",
+          "similarity": 0.557,
+          "rerank_score": null,
+          "score": 0.557,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 43,
+          "page_end": 44,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5563,
+          "rerank_score": null,
+          "score": 0.5563,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 29,
+          "page_end": 30,
+          "section": "CHAPTER I REGISTRATION, COMPULSORYREGISTRATION AND DE- REGISTRATION",
+          "similarity": 0.5541,
+          "rerank_score": null,
+          "score": 0.5541,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 36,
+          "page_end": 37,
+          "section": "CHAPTER I REGISTRATION, COMPULSORYREGISTRATION AND DE- REGISTRATION",
+          "similarity": 0.5421,
+          "rerank_score": null,
+          "score": 0.5421,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 97,
+          "page_end": 98,
+          "section": "PART-III ATTACHMENT AND SALE OFIMMOVABLE PROPERTY",
+          "similarity": 0.5392,
+          "rerank_score": null,
+          "score": 0.5392,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 29,
+          "page_end": 30,
+          "section": "CHAPTER I REGISTRATION, COMPULSORYREGISTRATION AND DE- REGISTRATION",
+          "similarity": 0.5392,
+          "rerank_score": null,
+          "score": 0.5392,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q009",
+      "category": "field_rule",
+      "answerable": true,
+      "question": "When do I have to fill invoiceRefNo, and how long should it be?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.11"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 418.6,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 37,
+          "page_end": 38,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5949,
+          "rerank_score": null,
+          "score": 0.5949,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "faqs.jsonl",
+          "page_start": 17,
+          "page_end": 21,
+          "section": "FAQ 17",
+          "similarity": 0.5862,
+          "rerank_score": null,
+          "score": 0.5862,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 16,
+          "page_end": 18,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.1. Sample JSON Data (For Sandbox Only):",
+          "similarity": 0.5851,
+          "rerank_score": null,
+          "score": 0.5851,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "iris_dashboard_manual.pdf",
+          "page_start": 7,
+          "page_end": 8,
+          "section": "",
+          "similarity": 0.5779,
+          "rerank_score": null,
+          "score": 0.5779,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.2. Sample JSON Data (For Production):",
+          "similarity": 0.5753,
+          "rerank_score": null,
+          "score": 0.5753,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 8,
+          "page_end": 10,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.1. Sample JSON Data (For Sandbox Only):",
+          "similarity": 0.5745,
+          "rerank_score": null,
+          "score": 0.5745,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q011",
+      "category": "field_rule",
+      "answerable": true,
+      "question": "Which query parameters does the SaleTypeToRate reference API need?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.30"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 408.5,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 29,
+          "page_end": 31,
+          "section": "5. Digital Invoicing Reference APIs > 5.7. Web method for Digital Invoicing \u2013 SRO Schedule",
+          "similarity": 0.5667,
+          "rerank_score": null,
+          "score": 0.5667,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 10,
+          "page_end": 11,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.2. Sample JSON Data (For Production):",
+          "similarity": 0.5461,
+          "rerank_score": null,
+          "score": 0.5461,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 8,
+          "page_end": 10,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.1. Sample JSON Data (For Sandbox Only):",
+          "similarity": 0.5426,
+          "rerank_score": null,
+          "score": 0.5426,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 40,
+          "page_end": 41,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5353,
+          "rerank_score": null,
+          "score": 0.5353,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 16,
+          "page_end": 18,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.1. Sample JSON Data (For Sandbox Only):",
+          "similarity": 0.5336,
+          "rerank_score": null,
+          "score": 0.5336,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 26,
+          "page_end": 29,
+          "section": "5. Digital Invoicing Reference APIs > 5.4. Web method for Digital Invoicing \u2013 SRO Item ID > 5.4.2. Sample Json Response:",
+          "similarity": 0.5323,
+          "rerank_score": null,
+          "score": 0.5323,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q012",
+      "category": "field_rule",
+      "answerable": true,
+      "question": "How can my ERP find out which unit of measure is allowed for a given HS code?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.31"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 432.3,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 39,
+          "page_end": 40,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.5803,
+          "rerank_score": null,
+          "score": 0.5803,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 31,
+          "page_end": 33,
+          "section": "5. Digital Invoicing Reference APIs > 5.9. Web method for Digital Invoicing \u2013 HS Code with UOM",
+          "similarity": 0.576,
+          "rerank_score": null,
+          "score": 0.576,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 182,
+          "page_end": 184,
+          "section": "STR-7",
+          "similarity": 0.5693,
+          "rerank_score": null,
+          "score": 0.5693,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 45,
+          "page_end": 46,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.5572,
+          "rerank_score": null,
+          "score": 0.5572,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 120,
+          "page_end": 122,
+          "section": "CHAPTER XIV-AD PROCEDURE FOR SEALING AND DE-SEALING OF BUSINESS PREMISES OF TIER-1 RETAILERS",
+          "similarity": 0.5537,
+          "rerank_score": null,
+          "score": 0.5537,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 144,
+          "page_end": 146,
+          "section": "143",
+          "similarity": 0.5449,
+          "rerank_score": null,
+          "score": 0.5449,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q015",
+      "category": "legal_rule",
+      "answerable": true,
+      "question": "How long do we have to keep the e-invoices we issue, and in what form?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.108"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 422.1,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 4,
+          "page_end": 5,
+          "section": "",
+          "similarity": 0.6832,
+          "rerank_score": null,
+          "score": 0.6832,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 107,
+          "page_end": 108,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.679,
+          "rerank_score": null,
+          "score": 0.679,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 107,
+          "page_end": 108,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.6657,
+          "rerank_score": null,
+          "score": 0.6657,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 61,
+          "page_end": 62,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.6411,
+          "rerank_score": null,
+          "score": 0.6411,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 108,
+          "page_end": 109,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.629,
+          "rerank_score": null,
+          "score": 0.629,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 6,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.6255,
+          "rerank_score": null,
+          "score": 0.6255,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q016",
+      "category": "legal_rule",
+      "answerable": true,
+      "question": "Our internet went down for a day. What do we do with invoices made while offline?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.109"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 449.7,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 6,
+          "page_end": 7,
+          "section": "",
+          "similarity": 0.6512,
+          "rerank_score": null,
+          "score": 0.6512,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 14,
+          "page_end": 16,
+          "section": "5. Invoice Dashboard > 5.1. Reattempting Invoice Submission After Connection Loss",
+          "similarity": 0.6207,
+          "rerank_score": null,
+          "score": 0.6207,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 5,
+          "page_end": 6,
+          "section": "",
+          "similarity": 0.6068,
+          "rerank_score": null,
+          "score": 0.6068,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 4,
+          "page_end": 5,
+          "section": "",
+          "similarity": 0.5974,
+          "rerank_score": null,
+          "score": 0.5974,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 10,
+          "page_end": 11,
+          "section": "",
+          "similarity": 0.5931,
+          "rerank_score": null,
+          "score": 0.5931,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 109,
+          "page_end": 110,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.5897,
+          "rerank_score": null,
+          "score": 0.5897,
+          "exact_match": false,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "id": "q017",
+      "category": "legal_rule",
+      "answerable": true,
+      "question": "We won't finish integration on time. Can we get more time, and how much?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.108"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 417.0,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 108,
+          "page_end": 109,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.575,
+          "rerank_score": null,
+          "score": 0.575,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "faqs.jsonl",
+          "page_start": 12,
+          "page_end": 17,
+          "section": "FAQ 12",
+          "similarity": 0.5652,
+          "rerank_score": null,
+          "score": 0.5652,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "extension_for_integration_2025.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5495,
+          "rerank_score": null,
+          "score": 0.5495,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 5,
+          "page_end": 6,
+          "section": "",
+          "similarity": 0.542,
+          "rerank_score": null,
+          "score": 0.542,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sro_709(I)_2025_registered_persons_required_to_integrate.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5108,
+          "rerank_score": null,
+          "score": 0.5108,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 109,
+          "page_end": 110,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.5108,
+          "rerank_score": null,
+          "score": 0.5108,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q018",
+      "category": "legal_rule",
+      "answerable": true,
+      "question": "Who pays for integrating our POS/ERP with FBR?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.107,110"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 400.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "faqs.jsonl",
+          "page_start": 6,
+          "page_end": 12,
+          "section": "FAQ 6",
+          "similarity": 0.6901,
+          "rerank_score": null,
+          "score": 0.6901,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.6228,
+          "rerank_score": null,
+          "score": 0.6228,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "faqs.jsonl",
+          "page_start": 12,
+          "page_end": 17,
+          "section": "FAQ 12",
+          "similarity": 0.6144,
+          "rerank_score": null,
+          "score": 0.6144,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "extension_for_integration_2025.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.6126,
+          "rerank_score": null,
+          "score": 0.6126,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 113,
+          "page_end": 114,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.612,
+          "rerank_score": null,
+          "score": 0.612,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 3,
+          "page_end": 4,
+          "section": "",
+          "similarity": 0.6099,
+          "rerank_score": null,
+          "score": 0.6099,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q022",
+      "category": "table_matrix",
+      "answerable": true,
+      "question": "We're a textile manufacturer. Which sandbox scenarios apply to us?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.47"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 415.4,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 20,
+          "page_end": 21,
+          "section": "14. What happens after Sandbox access is granted?",
+          "similarity": 0.6193,
+          "rerank_score": null,
+          "score": 0.6193,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 47,
+          "page_end": 48,
+          "section": "9. Scenarios for Sandbox Testing",
+          "similarity": 0.5823,
+          "rerank_score": null,
+          "score": 0.5823,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5227,
+          "rerank_score": null,
+          "score": 0.5227,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 48,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5067,
+          "rerank_score": null,
+          "score": 0.5067,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. What are the two integration modes available?",
+          "similarity": 0.4988,
+          "rerank_score": null,
+          "score": 0.4988,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 50,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.4921,
+          "rerank_score": null,
+          "score": 0.4921,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q023",
+      "category": "table_matrix",
+      "answerable": true,
+      "question": "Which scenarios does a steel-sector manufacturer need to test?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.47"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 399.3,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 47,
+          "page_end": 48,
+          "section": "9. Scenarios for Sandbox Testing",
+          "similarity": 0.5507,
+          "rerank_score": null,
+          "score": 0.5507,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5264,
+          "rerank_score": null,
+          "score": 0.5264,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 124,
+          "page_end": 125,
+          "section": "SUB-CHAPTER 2 LICENSING",
+          "similarity": 0.5164,
+          "rerank_score": null,
+          "score": 0.5164,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 48,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5134,
+          "rerank_score": null,
+          "score": 0.5134,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 50,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5131,
+          "rerank_score": null,
+          "score": 0.5131,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 20,
+          "page_end": 21,
+          "section": "14. What happens after Sandbox access is granted?",
+          "similarity": 0.5105,
+          "rerank_score": null,
+          "score": 0.5105,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q024",
+      "category": "table_matrix",
+      "answerable": true,
+      "question": "For a service provider in the services sector, which scenarios apply?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.50"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 387.6,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 50,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.6052,
+          "rerank_score": null,
+          "score": 0.6052,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 49,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.6008,
+          "rerank_score": null,
+          "score": 0.6008,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 48,
+          "page_end": 49,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5959,
+          "rerank_score": null,
+          "score": 0.5959,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 50,
+          "page_end": 51,
+          "section": "10. Applicable Scenarios based on Business Activity",
+          "similarity": 0.5636,
+          "rerank_score": null,
+          "score": 0.5636,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 47,
+          "page_end": 48,
+          "section": "9. Scenarios for Sandbox Testing",
+          "similarity": 0.5232,
+          "rerank_score": null,
+          "score": 0.5232,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 23,
+          "page_end": 24,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5116,
+          "rerank_score": null,
+          "score": 0.5116,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q027",
+      "category": "multi_part",
+      "answerable": true,
+      "question": "The law and the PRAL spec both describe the QR code on the invoice. What size does each one specify?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.107",
+        "di_api_technical_spec_v1.12.pdf p.35"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 440.5,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 45,
+          "page_end": 46,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.6152,
+          "rerank_score": null,
+          "score": 0.6152,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.2. Sample JSON Data (For Production):",
+          "similarity": 0.6138,
+          "rerank_score": null,
+          "score": 0.6138,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 44,
+          "page_end": 45,
+          "section": "8. Purchase Error Codes",
+          "similarity": 0.6104,
+          "rerank_score": null,
+          "score": 0.6104,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 10,
+          "page_end": 11,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.2. Sample JSON Data (For Production):",
+          "similarity": 0.6065,
+          "rerank_score": null,
+          "score": 0.6065,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 39,
+          "page_end": 40,
+          "section": "7. Sales Error Codes",
+          "similarity": 0.6032,
+          "rerank_score": null,
+          "score": 0.6032,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 3,
+          "page_end": 4,
+          "section": "",
+          "similarity": 0.6019,
+          "rerank_score": null,
+          "score": 0.6019,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q028",
+      "category": "multi_part",
+      "answerable": true,
+      "question": "When did corporate and non-corporate persons originally have to integrate, and what were the dates after FBR's June 2025 extension?",
+      "expected": [
+        "sro_709(I)_2025_registered_persons_required_to_integrate.pdf p.1",
+        "extension_for_integration_2025.pdf p.1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 1.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 488.7,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "extension_for_integration_2025.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.6834,
+          "rerank_score": null,
+          "score": 0.6834,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 2,
+          "filename": "sro_709(I)_2025_registered_persons_required_to_integrate.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5984,
+          "rerank_score": null,
+          "score": 0.5984,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.592,
+          "rerank_score": null,
+          "score": 0.592,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "faqs.jsonl",
+          "page_start": 12,
+          "page_end": 17,
+          "section": "FAQ 12",
+          "similarity": 0.5569,
+          "rerank_score": null,
+          "score": 0.5569,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "faqs.jsonl",
+          "page_start": 6,
+          "page_end": 12,
+          "section": "FAQ 6",
+          "similarity": 0.5359,
+          "rerank_score": null,
+          "score": 0.5359,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 1,
+          "page_end": 2,
+          "section": "",
+          "similarity": 0.5079,
+          "rerank_score": null,
+          "score": 0.5079,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q029",
+      "category": "multi_part",
+      "answerable": true,
+      "question": "Which sandbox URL do I post invoices to, and how do I send the security token?",
+      "expected": [
+        "di_api_technical_spec_v1.12.pdf p.6,7"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.3333333333333333,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 434.4,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 20,
+          "page_end": 21,
+          "section": "14. What happens after Sandbox access is granted?",
+          "similarity": 0.6671,
+          "rerank_score": null,
+          "score": 0.6671,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 8,
+          "page_end": 10,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.6567,
+          "rerank_score": null,
+          "score": 0.6567,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 6,
+          "page_end": 8,
+          "section": "3. Web API > 3.1. Web API Security",
+          "similarity": 0.6304,
+          "rerank_score": null,
+          "score": 0.6304,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 4,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. What are the two integration modes available?",
+          "similarity": 0.6138,
+          "rerank_score": null,
+          "score": 0.6138,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 16,
+          "page_end": 18,
+          "section": "4. Digital Invoicing API > 4.2. Web method for Digital Invoicing - Validate > 4.2.1. Sample JSON Data (For Sandbox Only):",
+          "similarity": 0.5617,
+          "rerank_score": null,
+          "score": 0.5617,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 10,
+          "page_end": 14,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.5494,
+          "rerank_score": null,
+          "score": 0.5494,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q032",
+      "category": "screenshot",
+      "answerable": true,
+      "question": "How much can a licensed integrator other than PRAL charge us for digital invoicing?",
+      "expected": [
+        "di_user_manual_v1.5.pdf p.7"
+      ],
+      "hit": 0.0,
+      "recall": 0.0,
+      "reciprocal_rank": 0.0,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 458.2,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "faqs.jsonl",
+          "page_start": 6,
+          "page_end": 12,
+          "section": "FAQ 6",
+          "similarity": 0.7414,
+          "rerank_score": null,
+          "score": 0.7414,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 7,
+          "page_end": 8,
+          "section": "",
+          "similarity": 0.6969,
+          "rerank_score": null,
+          "score": 0.6969,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 10,
+          "page_end": 14,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.6939,
+          "rerank_score": null,
+          "score": 0.6939,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 15,
+          "page_end": 18,
+          "section": "1. Log In",
+          "similarity": 0.6936,
+          "rerank_score": null,
+          "score": 0.6936,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 6,
+          "page_end": 7,
+          "section": "",
+          "similarity": 0.6882,
+          "rerank_score": null,
+          "score": 0.6882,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.685,
+          "rerank_score": null,
+          "score": 0.685,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q033",
+      "category": "screenshot",
+      "answerable": true,
+      "question": "Our client has no ERP system. Which integration mode should they choose in the DI portal?",
+      "expected": [
+        "di_user_manual_v1.5.pdf p.7"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.2,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 507.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. What are the two integration modes available?",
+          "similarity": 0.617,
+          "rerank_score": null,
+          "score": 0.617,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 15,
+          "page_end": 18,
+          "section": "1. Log In",
+          "similarity": 0.5889,
+          "rerank_score": null,
+          "score": 0.5889,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 8,
+          "page_end": 10,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.5844,
+          "rerank_score": null,
+          "score": 0.5844,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 29,
+          "page_end": 31,
+          "section": "5. Digital Invoicing Reference APIs > 5.7. Web method for Digital Invoicing \u2013 SRO Schedule",
+          "similarity": 0.5735,
+          "rerank_score": null,
+          "score": 0.5735,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 5,
+          "page_end": 8,
+          "section": "",
+          "similarity": 0.5626,
+          "rerank_score": null,
+          "score": 0.5626,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 6,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 3,
+          "page_end": 6,
+          "section": "",
+          "similarity": 0.5617,
+          "rerank_score": null,
+          "score": 0.5617,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q035",
+      "category": "version_sensitive",
+      "answerable": true,
+      "question": "How many server IP addresses can we enter in the IP whitelisting form, and how long does approval take?",
+      "expected": [
+        "di_user_manual_v1.5.pdf p.9"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 677.5,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 18,
+          "page_end": 20,
+          "section": "4. What are the two integration modes available?",
+          "similarity": 0.5905,
+          "rerank_score": null,
+          "score": 0.5905,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 8,
+          "page_end": 10,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.5777,
+          "rerank_score": null,
+          "score": 0.5777,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 34,
+          "page_end": 35,
+          "section": "CHAPTER I REGISTRATION, COMPULSORYREGISTRATION AND DE- REGISTRATION",
+          "similarity": 0.5609,
+          "rerank_score": null,
+          "score": 0.5609,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 125,
+          "page_end": 126,
+          "section": "SUB-CHAPTER 2 LICENSING",
+          "similarity": 0.5516,
+          "rerank_score": null,
+          "score": 0.5516,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 110,
+          "page_end": 111,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.5375,
+          "rerank_score": null,
+          "score": 0.5375,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 7,
+          "page_end": 8,
+          "section": "",
+          "similarity": 0.5322,
+          "rerank_score": null,
+          "score": 0.5322,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q036",
+      "category": "version_sensitive",
+      "answerable": true,
+      "question": "Does a retailer have to integrate with FBR because of the withholding tax deducted from it, and what is the threshold?",
+      "expected": [
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.105,106",
+        "sro_2071(I)_2025_retailers_integration.pdf p.1"
+      ],
+      "hit": 1.0,
+      "recall": 0.5,
+      "reciprocal_rank": 0.3333333333333333,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 735.8,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "faqs.jsonl",
+          "page_start": 6,
+          "page_end": 12,
+          "section": "FAQ 6",
+          "similarity": 0.5977,
+          "rerank_score": null,
+          "score": 0.5977,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 114,
+          "page_end": 115,
+          "section": "CHAPTER XIV-A MONITORING OR TRACKING OF CERTAIN REGISTERED PERSONS BY ELECTRONIC OR OTHER MEANS",
+          "similarity": 0.5954,
+          "rerank_score": null,
+          "score": 0.5954,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sro_2071(I)_2025_retailers_integration.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5796,
+          "rerank_score": null,
+          "score": 0.5796,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 4,
+          "filename": "faqs.jsonl",
+          "page_start": 17,
+          "page_end": 21,
+          "section": "FAQ 17",
+          "similarity": 0.5718,
+          "rerank_score": null,
+          "score": 0.5718,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 113,
+          "page_end": 114,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.5691,
+          "rerank_score": null,
+          "score": 0.5691,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 119,
+          "page_end": 120,
+          "section": "CHAPTER XIV-AD PROCEDURE FOR SEALING AND DE-SEALING OF BUSINESS PREMISES OF TIER-1 RETAILERS",
+          "similarity": 0.5627,
+          "rerank_score": null,
+          "score": 0.5627,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q038",
+      "category": "reworded_faq",
+      "answerable": true,
+      "question": "Should our system create the digital invoice when we bill the customer or when they pay?",
+      "expected": [
+        "faqs.jsonl p.20",
+        "sales_tax_act_1990_upto_2026-06-30.pdf p.24"
+      ],
+      "hit": 1.0,
+      "recall": 0.5,
+      "reciprocal_rank": 0.2,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 429.7,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 10,
+          "page_end": 14,
+          "section": "4. Digital Invoicing User Manual > 4.1. Taxpayer\u2019s Registration Process > API Integration",
+          "similarity": 0.6665,
+          "rerank_score": null,
+          "score": 0.6665,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 15,
+          "page_end": 18,
+          "section": "1. Log In",
+          "similarity": 0.6634,
+          "rerank_score": null,
+          "score": 0.6634,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.6559,
+          "rerank_score": null,
+          "score": 0.6559,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 2,
+          "page_end": 3,
+          "section": "",
+          "similarity": 0.643,
+          "rerank_score": null,
+          "score": 0.643,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "faqs.jsonl",
+          "page_start": 17,
+          "page_end": 21,
+          "section": "FAQ 17",
+          "similarity": 0.6383,
+          "rerank_score": null,
+          "score": 0.6383,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 3,
+          "page_end": 4,
+          "section": "",
+          "similarity": 0.6326,
+          "rerank_score": null,
+          "score": 0.6326,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q039",
+      "category": "reworded_faq",
+      "answerable": true,
+      "question": "What happens to us if we miss the digital invoicing integration deadline?",
+      "expected": [
+        "faqs.jsonl p.16",
+        "sales_tax_rules_2006_upto_2026-07-31.pdf p.109"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "reciprocal_rank": 0.5,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 398.2,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 5,
+          "page_end": 6,
+          "section": "",
+          "similarity": 0.6964,
+          "rerank_score": null,
+          "score": 0.6964,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "faqs.jsonl",
+          "page_start": 12,
+          "page_end": 17,
+          "section": "FAQ 12",
+          "similarity": 0.673,
+          "rerank_score": null,
+          "score": 0.673,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 3,
+          "filename": "faqs.jsonl",
+          "page_start": 1,
+          "page_end": 6,
+          "section": "FAQ 1",
+          "similarity": 0.6648,
+          "rerank_score": null,
+          "score": 0.6648,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 108,
+          "page_end": 109,
+          "section": "CHAPTER XIV PROCEDURE FOR LICENSING, ISSUANCE OF ELECTRONIC SALES TAX INVOICES AND INTEGRATION OF REGISTERED PERSONS",
+          "similarity": 0.6532,
+          "rerank_score": null,
+          "score": 0.6532,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 5,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 14,
+          "page_end": 16,
+          "section": "5. Invoice Dashboard > 5.1. Reattempting Invoice Submission After Connection Loss",
+          "similarity": 0.6453,
+          "rerank_score": null,
+          "score": 0.6453,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 6,
+          "page_end": 7,
+          "section": "",
+          "similarity": 0.641,
+          "rerank_score": null,
+          "score": 0.641,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q041",
+      "category": "reworded_faq",
+      "answerable": true,
+      "question": "We issued a digital invoice but the customer returned the goods. How do we cancel or correct it?",
+      "expected": [
+        "faqs.jsonl p.17",
+        "sales_tax_act_1990_upto_2026-06-30.pdf p.44"
+      ],
+      "hit": 1.0,
+      "recall": 0.5,
+      "reciprocal_rank": 0.2,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 454.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "di_user_manual_v1.5.pdf",
+          "page_start": 14,
+          "page_end": 16,
+          "section": "5. Invoice Dashboard > 5.1. Reattempting Invoice Submission After Connection Loss",
+          "similarity": 0.6543,
+          "rerank_score": null,
+          "score": 0.6543,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "di_api_technical_spec_v1.12.pdf",
+          "page_start": 14,
+          "page_end": 17,
+          "section": "4. Digital Invoicing API > 4.1. Web method for Digital Invoicing - Post > 4.1.5. Sample JSON Invalid Response 2:",
+          "similarity": 0.6219,
+          "rerank_score": null,
+          "score": 0.6219,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 115,
+          "page_end": 116,
+          "section": "CHAPTER XIV-AB Omitted 259[CHAPTER XIV-AC PRIZE SCHEME",
+          "similarity": 0.6193,
+          "rerank_score": null,
+          "score": 0.6193,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 6,
+          "page_end": 7,
+          "section": "",
+          "similarity": 0.6155,
+          "rerank_score": null,
+          "score": 0.6155,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "faqs.jsonl",
+          "page_start": 17,
+          "page_end": 21,
+          "section": "FAQ 17",
+          "similarity": 0.6151,
+          "rerank_score": null,
+          "score": 0.6151,
+          "exact_match": false,
+          "hit": true
+        },
+        {
+          "rank": 6,
+          "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+          "page_start": 11,
+          "page_end": 11,
+          "section": "",
+          "similarity": 0.6145,
+          "rerank_score": null,
+          "score": 0.6145,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q043",
+      "category": "unanswerable",
+      "answerable": false,
+      "question": "What is the income tax rate for a salaried individual earning Rs. 2 million a year in tax year 2026?",
+      "expected": [],
+      "hit": null,
+      "recall": null,
+      "reciprocal_rank": null,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 437.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 174,
+          "page_end": 175,
+          "section": "STR-1",
+          "similarity": 0.5141,
+          "rerank_score": null,
+          "score": 0.5141,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 220,
+          "page_end": 222,
+          "section": "219",
+          "similarity": 0.509,
+          "rerank_score": null,
+          "score": 0.509,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 217,
+          "page_end": 220,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5017,
+          "rerank_score": null,
+          "score": 0.5017,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 212,
+          "page_end": 213,
+          "section": "Sales Tax Act, 1990 211",
+          "similarity": 0.4996,
+          "rerank_score": null,
+          "score": 0.4996,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 87,
+          "page_end": 88,
+          "section": "Sales Tax Act, 1990 86",
+          "similarity": 0.4965,
+          "rerank_score": null,
+          "score": 0.4965,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 84,
+          "page_end": 85,
+          "section": "Sales Tax Act, 1990 83",
+          "similarity": 0.4934,
+          "rerank_score": null,
+          "score": 0.4934,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q044",
+      "category": "unanswerable",
+      "answerable": false,
+      "question": "What is the withholding tax rate on cash withdrawals from a bank under section 231A?",
+      "expected": [],
+      "hit": null,
+      "recall": null,
+      "reciprocal_rank": null,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 425.6,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 175,
+          "page_end": 176,
+          "section": "STR-7",
+          "similarity": 0.5738,
+          "rerank_score": null,
+          "score": 0.5738,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 31,
+          "page_end": 32,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5583,
+          "rerank_score": null,
+          "score": 0.5583,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 146,
+          "page_end": 147,
+          "section": "CHAPTER XIV-D WITHHOLDING OF SALES TAX BY THE RECIPIENT OF SUPPLY",
+          "similarity": 0.5566,
+          "rerank_score": null,
+          "score": 0.5566,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 176,
+          "page_end": 179,
+          "section": "STR-7",
+          "similarity": 0.5388,
+          "rerank_score": null,
+          "score": 0.5388,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 217,
+          "page_end": 220,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5381,
+          "rerank_score": null,
+          "score": 0.5381,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 174,
+          "page_end": 175,
+          "section": "STR-1",
+          "similarity": 0.5267,
+          "rerank_score": null,
+          "score": 0.5267,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q045",
+      "category": "unanswerable",
+      "answerable": false,
+      "question": "What sales tax rate does the Punjab Revenue Authority charge on restaurant services?",
+      "expected": [],
+      "hit": null,
+      "recall": null,
+      "reciprocal_rank": null,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 393.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 194,
+          "page_end": 197,
+          "section": "STR-7",
+          "similarity": 0.5688,
+          "rerank_score": null,
+          "score": 0.5688,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 217,
+          "page_end": 220,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.567,
+          "rerank_score": null,
+          "score": 0.567,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 146,
+          "page_end": 147,
+          "section": "CHAPTER XIV-D WITHHOLDING OF SALES TAX BY THE RECIPIENT OF SUPPLY",
+          "similarity": 0.5532,
+          "rerank_score": null,
+          "score": 0.5532,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 27,
+          "page_end": 29,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5524,
+          "rerank_score": null,
+          "score": 0.5524,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 31,
+          "page_end": 32,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.5451,
+          "rerank_score": null,
+          "score": 0.5451,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 148,
+          "page_end": 149,
+          "section": "Sales Tax Act, 1990 147",
+          "similarity": 0.5438,
+          "rerank_score": null,
+          "score": 0.5438,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q046",
+      "category": "unanswerable",
+      "answerable": false,
+      "question": "What is the last date to file the annual income tax return for individuals for tax year 2025?",
+      "expected": [],
+      "hit": null,
+      "recall": null,
+      "reciprocal_rank": null,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 411.9,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 36,
+          "page_end": 37,
+          "section": "CHAPTER II FILING OF RETURNS",
+          "similarity": 0.5875,
+          "rerank_score": null,
+          "score": 0.5875,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sro_709(I)_2025_registered_persons_required_to_integrate.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5737,
+          "rerank_score": null,
+          "score": 0.5737,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 37,
+          "page_end": 38,
+          "section": "CHAPTER II FILING OF RETURNS",
+          "similarity": 0.5592,
+          "rerank_score": null,
+          "score": 0.5592,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "extension_for_integration_2025.pdf",
+          "page_start": 1,
+          "page_end": 1,
+          "section": "",
+          "similarity": 0.5575,
+          "rerank_score": null,
+          "score": 0.5575,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 176,
+          "page_end": 179,
+          "section": "STR-7",
+          "similarity": 0.5558,
+          "rerank_score": null,
+          "score": 0.5558,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 38,
+          "page_end": 39,
+          "section": "CHAPTER II FILING OF RETURNS",
+          "similarity": 0.5519,
+          "rerank_score": null,
+          "score": 0.5519,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    },
+    {
+      "id": "q047",
+      "category": "unanswerable",
+      "answerable": false,
+      "question": "How do I get a refund of excess income tax deducted from my salary?",
+      "expected": [],
+      "hit": null,
+      "recall": null,
+      "reciprocal_rank": null,
+      "best_rerank_score": null,
+      "below_threshold": false,
+      "latency_ms": 402.4,
+      "retrieved": [
+        {
+          "rank": 1,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 45,
+          "page_end": 46,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.6566,
+          "rerank_score": null,
+          "score": 0.6566,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 2,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 52,
+          "page_end": 53,
+          "section": "CHAPTER \u2013 V REFUND",
+          "similarity": 0.6402,
+          "rerank_score": null,
+          "score": 0.6402,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 3,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 46,
+          "page_end": 46,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.6277,
+          "rerank_score": null,
+          "score": 0.6277,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 4,
+          "filename": "sales_tax_act_1990_upto_2026-06-30.pdf",
+          "page_start": 227,
+          "page_end": 228,
+          "section": "Sales Tax Act, 1990",
+          "similarity": 0.6252,
+          "rerank_score": null,
+          "score": 0.6252,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 5,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 207,
+          "page_end": 208,
+          "section": "STR-16",
+          "similarity": 0.5995,
+          "rerank_score": null,
+          "score": 0.5995,
+          "exact_match": false,
+          "hit": false
+        },
+        {
+          "rank": 6,
+          "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+          "page_start": 55,
+          "page_end": 56,
+          "section": "CHAPTER \u2013 V REFUND",
+          "similarity": 0.5977,
+          "rerank_score": null,
+          "score": 0.5977,
+          "exact_match": false,
+          "hit": false
+        }
+      ]
+    }
+  ]
+}
