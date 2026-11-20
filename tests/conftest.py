@@ -17,6 +17,7 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["ANTHROPIC_API_KEY"] = "test-key-not-real"
 
 from collections.abc import AsyncIterator  # noqa: E402
+from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
 import httpx  # noqa: E402
@@ -30,7 +31,16 @@ from sqlalchemy.pool import NullPool  # noqa: E402
 from app import models  # noqa: E402, F401  # registers the tables on Base.metadata
 from app.config import settings  # noqa: E402
 from app.db import Base, create_db_engine, get_db  # noqa: E402
-from app.deps import get_qdrant  # noqa: E402
+from app.deps import (  # noqa: E402
+    get_dense_embedder,
+    get_extractor,
+    get_qdrant,
+    get_session_factory,
+    get_sparse_embedder,
+)
+from app.ingestion.caption import FakeCaptioner  # noqa: E402
+from app.ingestion.embed import FakeEmbedder, FakeSparseEmbedder  # noqa: E402
+from app.ingestion.extract import Extractor  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 TEST_PASSWORD = "a-long-secret-phrase"
@@ -130,10 +140,37 @@ async def db_sessionmaker(db_engine: AsyncEngine) -> async_sessionmaker[AsyncSes
 
 
 @pytest.fixture
+def fake_dense() -> FakeEmbedder:
+    """Dense embedder that needs no model."""
+    return FakeEmbedder()
+
+
+@pytest.fixture
+def captioner() -> FakeCaptioner:
+    """Captioner that never calls the Anthropic API."""
+    return FakeCaptioner()
+
+
+@pytest.fixture(autouse=True)
+def upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Store every test's uploaded files in its own temporary folder."""
+    folder = tmp_path / "uploads"
+    monkeypatch.setattr(settings, "upload_dir", str(folder))
+    return folder
+
+
+@pytest.fixture
 async def db_client(
-    db_sessionmaker: async_sessionmaker[AsyncSession], qdrant: AsyncQdrantClient
+    db_sessionmaker: async_sessionmaker[AsyncSession],
+    qdrant: AsyncQdrantClient,
+    fake_dense: FakeEmbedder,
+    captioner: FakeCaptioner,
 ) -> AsyncIterator[httpx.AsyncClient]:
-    """Yield an HTTP client for an app that uses the real test database."""
+    """Yield an HTTP client for an app that uses the real test database.
+
+    Ingestion uses the real extractor and chunker, but fake embedders, a fake
+    captioner and in-memory Qdrant: no model is loaded, no API is called.
+    """
     application = create_app()
 
     async def override_get_db() -> AsyncIterator[AsyncSession]:
@@ -143,6 +180,10 @@ async def db_client(
 
     application.dependency_overrides[get_db] = override_get_db
     application.dependency_overrides[get_qdrant] = lambda: qdrant
+    application.dependency_overrides[get_extractor] = lambda: Extractor(captioner)
+    application.dependency_overrides[get_dense_embedder] = lambda: fake_dense
+    application.dependency_overrides[get_sparse_embedder] = FakeSparseEmbedder
+    application.dependency_overrides[get_session_factory] = lambda: db_sessionmaker
     transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
         yield http

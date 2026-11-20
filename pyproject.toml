@@ -11,11 +11,17 @@ dependencies = [
     "alembic>=1.20.1",
     "anthropic>=2.10.0",
     "asyncpg>=0.32.0",
+    "docling>=2.151.0",
     "fastapi[standard]>=0.163.2",
+    "fastembed>=0.9.1",
+    "flagembedding>=1.4.2",
+    "langchain-text-splitters>=1.1.3",
     "pwdlib[argon2]>=0.4.2",
     "pydantic-settings>=2.16.3",
     "pyjwt>=2.15.1",
     "pymupdf>=2.1",
+    "python-docx>=1.2.0",
+    "python-pptx>=1.0.2",
     "qdrant-client>=1.20.0",
     "sqlalchemy[asyncio]>=2.1.9",
     "tenacity>=9.2.1",
@@ -59,3 +65,7 @@ asyncio_default_fixture_loop_scope = "session"
 # Tests share the fixtures' event loop: database connections belong to the loop
 # that opened them and fail if used from another one.
 asyncio_default_test_loop_scope = "session"
+filterwarnings = [
+    # In-memory Qdrant ignores payload indexes; the real server uses them.
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+]

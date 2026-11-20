@@ -35,8 +35,8 @@ Prefer clear, conventional code over clever code, and follow the Teaching mode r
 ## Design decisions (already made; do not change without asking)
 | Concern | Choice |
 | --- | --- |
-| Text extraction | Docling (layout, tables as Markdown, built-in OCR for scanned pages); PyMuPDF fast path for text-layer PDFs; python-pptx fallback for PPTX; plain read for TXT/MD |
-| Screenshots / image-only pages | Caption with the small Claude model, indexed with page/slide number |
+| Text extraction | PyMuPDF for every PDF page with a text layer, including tables (`find_tables` -> Markdown, run only on pages with ruling lines); Docling for DOCX/PPTX and for OCR of low-text pages that are not mostly images; python-pptx fallback for PPTX; plain read for TXT/MD. Measured on the corpus: Docling 8-12 s/page on CPU vs PyMuPDF ~0.5-1 s/page with near-identical table Markdown |
+| Screenshots / image-only pages | Caption with the small Claude model (pages with almost no text and >= 40% image area; it transcribes visible text and describes the screen), indexed with page/slide number |
 | Chunking | Structure-aware per content type (legal section/rule, error-code row, matrix row with headers, whole JSON sample, FAQ Q&A, caption); fallback recursive splitter ~500 tokens, 75 overlap (LangChain text splitter). A `fixed_512` strategy exists only as the evaluation baseline |
 | Context header | Prepend "Doc title > section path" to every chunk before embedding |
 | Embeddings | BGE-M3 dense (1024-d, cosine), local, CPU; behind an `Embedder` interface (`EMBEDDER=local|api`) |
@@ -129,9 +129,11 @@ keep those names exactly so the grader finds them, and explain the extra modules
 | POST | /ask | token | 200 | 400 blocked by guardrail, 401, 422, 429, 503 |
 | GET | /health | public | 200 / 503 | — |
 
-- 201 on upload means ingestion finished (the brief: "uploaded and ingested"). Files above
-  `SYNC_INGEST_MAX_PAGES` (default 150) return 202 with status `processing` and are finished by a
-  background task; the frontend polls GET /documents/{id}.
+- 201 on upload means ingestion finished (the brief: "uploaded and ingested"). Validation,
+  extraction and chunking always run in the request; files with more than
+  `SYNC_INGEST_MAX_CHUNKS` chunks (default 120, ~2 min of CPU embedding) return 202 with status
+  `processing` and are embedded by a background task; the frontend polls GET /documents/{id}.
+  Chunks, not pages, because embedding cost follows chunk count (measured ~1 s/chunk on CPU).
 - Another user's document id returns 404 (never reveal it exists).
 - AskRequest: question (1-1000 chars after strip), optional history (last 6 turns).
 - AskResponse: request_id, answer, answerable (bool), language, citations[{n, chunk_id, doc_id,

@@ -162,6 +162,80 @@ class Token(BaseModel):
     )
 
 
+# --- Documents ----------------------------------------------------------------
+
+DocumentStatusName = Literal["queued", "processing", "ready", "failed"]
+
+
+class DocumentRead(BaseModel):
+    """A document as returned by the API (never the file path or owner id).
+
+    Attributes:
+        id: The document's UUID; use it in GET/DELETE /documents/{id}.
+        filename: Original file name, as shown in citations.
+        file_type: pdf, docx, pptx, txt or md (checked from the content).
+        size_bytes: File size.
+        status: ``ready`` when searchable; ``processing`` while a large file is
+            still being embedded (poll this document); ``failed`` with ``error``.
+        pages: Pages or slides; null for DOCX, TXT and MD.
+        chunk_count: Chunks stored in the vector database.
+        ocr_pages: Pages read by OCR or image captioning.
+        warnings: Non-fatal notes, e.g. instruction-like text was found.
+        error: Why ingestion failed, when ``status`` is ``failed``.
+        created_at: Upload time.
+        updated_at: Last status change.
+    """
+
+    id: uuid.UUID
+    filename: str
+    file_type: str
+    size_bytes: int
+    status: DocumentStatusName
+    pages: int | None
+    chunk_count: int
+    ocr_pages: int
+    warnings: list[str]
+    error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "5d1f8a2b-3c4e-4f60-8a9b-0c1d2e3f4a5b",
+                    "filename": "sro_69(I)_2025_digital_invoicing_rules.pdf",
+                    "file_type": "pdf",
+                    "size_bytes": 1843220,
+                    "status": "ready",
+                    "pages": 11,
+                    "chunk_count": 26,
+                    "ocr_pages": 0,
+                    "warnings": [],
+                    "error": None,
+                    "created_at": "2026-11-20T09:15:00Z",
+                    "updated_at": "2026-11-20T09:15:41Z",
+                },
+                {
+                    "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                    "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+                    "file_type": "pdf",
+                    "size_bytes": 2950112,
+                    "status": "processing",
+                    "pages": 232,
+                    "chunk_count": 0,
+                    "ocr_pages": 0,
+                    "warnings": [],
+                    "error": None,
+                    "created_at": "2026-11-20T09:20:00Z",
+                    "updated_at": "2026-11-20T09:21:05Z",
+                },
+            ]
+        },
+    )
+
+
 def error_responses(*status_codes: int) -> dict[int | str, dict[str, Any]]:
     """Build a route's ``responses=`` entry so Swagger shows its error codes.
 

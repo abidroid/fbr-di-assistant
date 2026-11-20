@@ -51,8 +51,44 @@ class Settings(BaseSettings):
     # --- Files and upload limits --------------------------------------------
     upload_dir: str = "uploads"
     max_upload_mb: int = 25
-    # Larger files return 202 and finish ingesting in a background task.
-    sync_ingest_max_pages: int = 150
+    # Uploads with more chunks return 202 and are embedded in a background
+    # task. Embedding costs ~1 s per chunk on CPU, so 120 keeps a 201 upload
+    # around two minutes. Chunks, not pages: the 51-page API spec makes 524
+    # chunks while the 11-page SRO 69 makes 26.
+    sync_ingest_max_chunks: int = 120
+    # Known corpus files (matched by sha256) get their title, authority and
+    # version date from here; other uploads count as third-party documents.
+    corpus_manifest_path: str = "corpus/manifest.jsonl"
+    # Zip-bomb limits for DOCX/PPTX (both are zip files): a tiny upload must not
+    # be allowed to expand into gigabytes when it is unpacked.
+    max_unzipped_mb: int = 200
+    max_zip_ratio: int = 100
+
+    # --- Extraction ---------------------------------------------------------
+    # A PDF page with less text than this has no real text layer (a scan or a
+    # screenshot), so it goes to OCR or captioning instead of PyMuPDF.
+    min_text_chars_per_page: int = 50
+    # Share of the page covered by images above which a low-text page is treated
+    # as a screenshot and captioned by the small Claude model.
+    caption_min_image_ratio: float = 0.4
+    # A page with a text layer whose image covers at least this share of it is
+    # a scan with OCR text: its font sizes follow the scan and mean nothing.
+    scanned_page_image_ratio: float = 0.9
+    # A header/footer line repeated on more than this share of pages is removed.
+    repeated_line_ratio: float = 0.5
+    # Running headers/footers sit in the top/bottom 8% of a PDF page.
+    pdf_margin_ratio: float = 0.08
+    # Text this much bigger than the body font is a heading (14 pt vs 12 pt body).
+    heading_size_ratio: float = 1.1
+    # Text at most this share of the body font is a footnote or a footnote
+    # marker (8 pt notes, 5-9 pt superscript numbers vs 12 pt body).
+    small_font_ratio: float = 0.8
+    # Captions run in parallel, but at most this many at once, to stay well
+    # under the API rate limit.
+    caption_concurrency: int = 4
+    # Longest side of the PNG sent for captioning; about what the model reads
+    # without downscaling, and small enough to keep image tokens cheap.
+    caption_image_px: int = 1500
 
     # --- Ingestion: embeddings, chunking, Qdrant index ----------------------
     embedder: Literal["local", "api"] = "local"
@@ -65,8 +101,28 @@ class Settings(BaseSettings):
     # The fixed_512 strategy exists only as the evaluation baseline.
     fixed_chunk_size: int = 512
     fixed_chunk_overlap: int = 50
+    # Chunk sizes are in tokens; we measure characters and assume ~4 per token.
+    # Exact counts do not matter (BGE-M3 accepts 8192 tokens) and this keeps the
+    # chunker free of a tokenizer download, so tests stay fast and offline.
+    chars_per_token: int = 4
+    # A JSON sample stays whole up to this size (it is only useful complete);
+    # bigger ones are split like normal text. BGE-M3 reads up to 8192 tokens.
+    max_json_chunk_tokens: int = 2000
+    # Longest text BGE-M3 reads per chunk. The library default (512) would
+    # silently cut off long JSON samples and rules; 2048 covers our largest
+    # chunks (2000-token JSON) plus the context header.
+    embed_max_tokens: int = 2048
+    # Texts the model processes together. Measured on CPU (8 threads): batch 1
+    # = 0.99 s/chunk, 4 = 1.41 s, 8 = 1.88 s; a batch is padded to its longest
+    # text and a CPU gains nothing from parallel rows. Use 16-32 on a GPU.
+    embed_batch_size: int = 1
+    # CPU threads for the embedding model; 0 = all cores. torch's default uses
+    # half the logical cores, measured 1.9x slower here.
+    embed_threads: int = 0
     qdrant_collection: str = "fbr_di_final"
     qdrant_timeout_s: int = 10
+    # Attempts per Qdrant call (first try + retries) before answering 503.
+    qdrant_max_retries: int = 3
     hnsw_m: int = 16
     hnsw_ef_construct: int = 100
 
