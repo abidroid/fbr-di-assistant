@@ -107,6 +107,34 @@ def test_footnote_marker_removed_and_amendment_moved_to_metadata() -> None:
     assert not any("Added by" in b.text for b in blocks)
 
 
+def test_footnote_number_and_text_on_separate_lines_still_pair_up() -> None:
+    # As on Rules page 105: the 5 pt number and the 8 pt note are in
+    # different styles (so different runs) and on slightly different lines.
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 100), "252", fontsize=7)
+    page.insert_text((90, 100), "[(3) Retailers shall integrate.]", fontsize=12)
+    page.insert_textbox(pymupdf.Rect(72, 120, 540, 400), BODY * 2, fontsize=12)
+    page.insert_text((72, 700), "252", fontsize=5)
+    page.insert_text((85, 706), "Sub-rule (3) added vide S.R.O. 2071(I)/2025.", fontsize=8)
+    blocks = read_pdf_text_layer(pdf_bytes(document)).blocks
+    assert blocks[0].amended_by == ("S.R.O. 2071(I)/2025",)
+
+
+def test_scanned_pages_are_marked_ocr_and_sizes_are_not_headings() -> None:
+    document = pymupdf.open()
+    scan = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 60, 80), False)
+    scan.clear_with(230)
+    for size in (16, 11, 13):  # an OCR layer sizes each line to fit the scan
+        page = document.new_page()
+        page.insert_image(page.rect, pixmap=scan)
+        page.insert_text((72, 80), "Federal Board of Revenue", fontsize=size)
+        page.insert_textbox(pymupdf.Rect(72, 100, 540, 300), BODY, fontsize=10)
+    blocks = read_pdf_text_layer(pdf_bytes(document)).blocks
+    assert all(block.ocr for block in blocks)
+    assert all(block.section_path == () for block in blocks)
+
+
 def test_non_amendment_footnote_is_kept_as_text() -> None:
     document = pymupdf.open()
     page = document.new_page()

@@ -25,7 +25,7 @@ import logging
 import re
 import threading
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -73,6 +73,11 @@ FRONT_MATTER = {
     "document changelog",
     "index",
 }
+# A table-of-contents line: dot leaders then a page number ("Audit. ...... 91").
+# TOC entries would compete with the real rule in search, so they are dropped.
+TOC_LINE_RE = re.compile(r"\.{5,}\s*\d+\s*$")
+# A table cell that is data, not a column name: "1.", "0022", "SN001", "12-B".
+CODE_CELL_RE = re.compile(r"[\d.\s-]+|[A-Z]{1,4}\d{2,}[A-Z]?|\d+[A-Za-z]?")
 # Private-use characters are icon-font glyphs (bullets such as U+F0B7) that
 # carry no meaning and would only add noise to embeddings.
 PRIVATE_USE_RE = re.compile("[-]")
@@ -341,6 +346,27 @@ class BodyStyle:
     font: str
 
 
+@dataclass
+class PdfContext:
+    """What reading one page needs to know about the whole document.
+
+    Attributes:
+        body: The normal text style.
+        repeated: Normalised running header/footer lines to drop.
+        size_levels: Heading font size -> level, from `heading_size_levels`.
+        headings: The current heading path, (level, text) outermost first.
+            It carries over pages: a chapter heading still applies later.
+        table_header: Header row of the last real table, for continuation
+            tables (a long table goes on over pages without repeating it).
+    """
+
+    body: BodyStyle
+    repeated: set[str]
+    size_levels: dict[float, int]
+    headings: list[tuple[int, str]] = field(default_factory=list)
+    table_header: list[str] | None = None
+
+
 def read_pdf_text_layer(data: bytes) -> PdfScan:
     """Read every PDF page that has a text layer and sort out the rest.
 
@@ -352,9 +378,15 @@ def read_pdf_text_layer(data: bytes) -> PdfScan:
     """
     with pymupdf.open(stream=data, filetype="pdf") as document:
         body = body_style(document)
-        repeated = repeated_margin_lines(document)
-        size_levels = heading_size_levels(document, body)
-        headings: list[tuple[int, str]] = []  # (level, text), outermost first
+        scanned = [is_scanned_page(page) for page in document]
+        # In a scan the OCR layer sizes each line to match the image, so font
+        # sizes are noise, not headings; rule splitting still structures it.
+        mostly_scanned = sum(scanned) > document.page_count / 2
+        context = PdfContext(
+            body=body,
+            repeated=repeated_margin_lines(document),
+            size_levels={} if mostly_scanned else heading_size_levels(document, body),
+        )
         blocks: list[ExtractedBlock] = []
         caption_pages: list[int] = []
         ocr_pages: list[int] = []
@@ -366,7 +398,12 @@ def read_pdf_text_layer(data: bytes) -> PdfScan:
                 else:
                     ocr_pages.append(number)
                 continue
-            blocks.extend(read_pdf_page(page, body, repeated, size_levels, headings))
+            page_blocks = read_pdf_page(page, context)
+            if scanned[page.number]:
+                # The text came from someone else's OCR, so it may contain
+                # misreadings ("lncome" for "Income"); say so in the metadata.
+                page_blocks = [replace(block, ocr=True) for block in page_blocks]
+            blocks.extend(page_blocks)
         return PdfScan(
             blocks=blocks,
             caption_pages=caption_pages,
@@ -376,13 +413,7 @@ def read_pdf_text_layer(data: bytes) -> PdfScan:
         )
 
 
-def read_pdf_page(
-    page: pymupdf.Page,
-    body: BodyStyle,
-    repeated: set[str],
-    size_levels: dict[float, int],
-    headings: list[tuple[int, str]],
-) -> list[ExtractedBlock]:
+def read_pdf_page(page: pymupdf.Page, context: PdfContext) -> list[ExtractedBlock]:
     """Turn one PDF page into blocks: body text, tables and footnotes.
 
     Each PyMuPDF block is split into style runs first, because a block can
@@ -391,25 +422,26 @@ def read_pdf_page(
 
     Args:
         page: The page to read.
-        body: The document's normal text style.
-        repeated: Normalised running header/footer lines to drop.
-        size_levels: Heading font size -> level, from `heading_size_levels`.
-        headings: The current heading path; updated in place, because a
-            heading on this page still applies on the next one.
+        context: Document-wide facts; its heading path and table header are
+            updated in place, because they carry over to the next page.
 
     Returns:
         Blocks in reading order.
     """
     number = page.number + 1
     height = page.rect.height
+    body, repeated, size_levels = context.body, context.repeated, context.size_levels
+    headings = context.headings
     tables = find_page_tables(page)
     table_rects = [rect for rect, _ in tables]
     footnotes: dict[str, str] = {}
     # (y position, block) pairs so tables can be slotted into reading order.
-    items: list[tuple[float, ExtractedBlock]] = [
-        (rect.y0, ExtractedBlock(text=md, page=number, section_path=_path(headings), kind="table"))
-        for rect, md in tables
-    ]
+    items: list[tuple[float, ExtractedBlock, frozenset[str]]] = []
+    for rect, rows in tables:
+        markdown = table_markdown(rows, context)
+        if markdown:
+            table = ExtractedBlock(markdown, number, _path(headings), kind="table")
+            items.append((rect.y0, table, frozenset()))
     pending: list[tuple[float, str, set[str]]] = []  # body text waiting to be merged
     last_level: int | None = None  # level of the run just before, if a heading
 
@@ -425,12 +457,15 @@ def read_pdf_page(
             continue
 
         runs = style_runs(raw["lines"])
+        # A note's number (5 pt) and its text (8 pt) are different styles, so
+        # they fall into different runs; collect them and parse them together.
+        note_spans: list[dict[str, Any]] = []
         for index, run in enumerate(runs):
             spans = [span for line in run for span in line["spans"]]
             size, _font = _dominant_style(spans)
             y0 = run[0]["bbox"][1]
             if size <= body.size * settings.small_font_ratio and y0 > height / 2:
-                footnotes.update(parse_footnotes(spans))
+                note_spans += spans
                 continue
             text, markers = _text_without_markers(run, body.size)
             if not text:
@@ -443,17 +478,20 @@ def read_pdf_page(
                 last_level = None
                 pending.append((y0, text, markers))
                 continue
-            _flush(pending, items, number, headings, footnotes)
+            _flush(pending, items, number, headings)
             if last_level == level and headings and _continues_title(heading):
                 # A title split over runs ("CHAPTER XIV" / "PROCEDURE FOR ...").
                 headings[-1] = (level, f"{headings[-1][1]} {heading}")
             else:
                 _push_heading(headings, level, heading)
             last_level = level
+        if note_spans:
+            footnotes.update(parse_footnotes(note_spans))
 
-    _flush(pending, items, number, headings, footnotes)
+    _flush(pending, items, number, headings)
     items.sort(key=lambda item: item[0])
-    blocks = [block for _, block in items]
+    # Now every footnote on the page is known, so markers can be resolved.
+    blocks = [_with_amendments(block, markers, footnotes) for _, block, markers in items]
     # Footnotes that are not amendments still carry meaning (e.g. "Officer of
     # Sales Tax" now means "Officer of Inland Revenue"), so they stay as text.
     notes = [f"[{n}] {t}" for n, t in footnotes.items() if not AMENDMENT_RE.search(t)]
@@ -645,6 +683,19 @@ def image_coverage(page: pymupdf.Page) -> float:
     return min(covered / area, 1.0) if area else 0.0
 
 
+def is_scanned_page(page: pymupdf.Page) -> bool:
+    """Say whether a page is a scanned image with an OCR text layer on top.
+
+    Args:
+        page: The page.
+
+    Returns:
+        True if it has text and an image covering almost all of it.
+    """
+    has_text = len(page.get_text().strip()) >= settings.min_text_chars_per_page
+    return has_text and image_coverage(page) >= settings.scanned_page_image_ratio
+
+
 def has_ruling_grid(page: pymupdf.Page) -> bool:
     """Cheap pre-check: does the page have the lines a table is drawn with?
 
@@ -674,28 +725,98 @@ def has_ruling_grid(page: pymupdf.Page) -> bool:
     return horizontal >= MIN_GRID_LINES and vertical >= MIN_GRID_LINES
 
 
-def find_page_tables(page: pymupdf.Page) -> list[tuple[pymupdf.Rect, str]]:
-    """Find tables on a page and render each as Markdown.
+def find_page_tables(page: pymupdf.Page) -> list[tuple[pymupdf.Rect, list[list[str]]]]:
+    """Find tables on a page and read the text of every cell.
+
+    ``find_tables`` only supplies the cell boxes. Its own cell text drops the
+    spaces in these PDFs ("Sellernotregistered"), so each cell is filled from
+    the page's normal word list instead, read once per page. The
+    ``lines_strict`` strategy ignores coloured cell backgrounds, which the
+    default strategy mistakes for extra column lines.
 
     Args:
         page: The page.
 
     Returns:
-        (area, markdown) for every table with content.
+        (area, rows of cell texts) for every table found.
     """
     if not has_ruling_grid(page):
         return []
     try:
-        found = page.find_tables().tables
+        found = page.find_tables(strategy="lines_strict").tables
     except Exception:  # table detection is heuristic; never fail a document on it
         logger.warning("Table detection failed on page %s", page.number + 1, exc_info=True)
         return []
+    words = page.get_text("words", sort=True)
     tables = []
     for table in found:
-        markdown = table.to_markdown().strip()
-        if markdown:
-            tables.append((pymupdf.Rect(table.bbox), markdown))
+        rows = [[_cell_text(words, cell) for cell in row.cells] for row in table.rows]
+        tables.append((pymupdf.Rect(table.bbox), rows))
     return tables
+
+
+def table_markdown(rows: list[list[str]], context: PdfContext) -> str:
+    """Render table rows as Markdown, borrowing the header if it continues.
+
+    A table that runs over several pages repeats no header on later pages,
+    so its first row there is data ("0022 | Please provide ..."). Then the
+    previous real header with the same number of columns is used.
+
+    Args:
+        rows: Cell texts, row by row.
+        context: Holds the last real header; updated when a new one is seen.
+
+    Returns:
+        A Markdown table, or "" if there is nothing in it.
+    """
+    rows = [row for row in rows if any(row) and not any(TOC_LINE_RE.search(c) for c in row)]
+    if not rows:
+        return ""
+    if looks_like_header(rows[0]):
+        header, data = rows[0], rows[1:]
+        context.table_header = header
+    elif context.table_header and len(context.table_header) == len(rows[0]):
+        header, data = context.table_header, rows
+    else:
+        header, data = [""] * len(rows[0]), rows
+
+    def line(cells: list[str]) -> str:
+        return "|" + "|".join(cell.replace("|", "/") for cell in cells) + "|"
+
+    return "\n".join([line(header), line(["---"] * len(header)), *map(line, data)])
+
+
+def looks_like_header(row: list[str]) -> bool:
+    """Say whether a table row is a header rather than data.
+
+    Args:
+        row: Cell texts of the row.
+
+    Returns:
+        False if any cell is a number or a code (data rows start "1." or
+        "0022" or "SN001"), or if every cell is empty.
+    """
+    cells = [cell for cell in row if cell]
+    return bool(cells) and not any(CODE_CELL_RE.fullmatch(cell) for cell in cells)
+
+
+def _cell_text(words: list[tuple[Any, ...]], cell: tuple[float, ...] | None) -> str:
+    """Join the words whose centre lies inside a table cell.
+
+    Args:
+        words: The page's words from ``get_text("words", sort=True)``.
+        cell: The cell box, or None for a merged-away cell.
+
+    Returns:
+        The cell's text on one line.
+    """
+    if cell is None:
+        return ""
+    x0, y0, x1, y1 = cell
+    inside = [
+        w[4] for w in words if x0 <= (w[0] + w[2]) / 2 <= x1 and y0 <= (w[1] + w[3]) / 2 <= y1
+    ]
+    return PRIVATE_USE_RE.sub("", " ".join(inside)).strip()
 
 
 def parse_footnotes(spans: list[dict[str, Any]]) -> dict[str, str]:
@@ -777,41 +898,56 @@ def _text_without_markers(lines: list[dict[str, Any]], body_size: float) -> tupl
                 continue
             parts.append(span["text"])
         joined = " ".join(PRIVATE_USE_RE.sub("", "".join(parts)).split())
-        if joined:
+        if joined and not TOC_LINE_RE.search(joined):
             out_lines.append(joined)
     return "\n".join(out_lines), markers
 
 
 def _flush(
     pending: list[tuple[float, str, set[str]]],
-    items: list[tuple[float, ExtractedBlock]],
+    items: list[tuple[float, ExtractedBlock, frozenset[str]]],
     page: int,
     headings: list[tuple[int, str]],
-    footnotes: dict[str, str],
 ) -> None:
-    """Merge waiting body text under the current heading into one block.
+    """Turn waiting body text under the current heading into blocks.
+
+    One block per paragraph, so an amendment marker in one paragraph (Rule
+    150N's sub-rule 3) is not attached to the next one (Rule 150O). The
+    chunker joins paragraphs of the same section again. Footnote markers
+    are kept with each block, not resolved yet: the notes sit at the bottom
+    of the page and may not have been read.
 
     Args:
         pending: Body text collected since the last heading; emptied here.
-        items: Output list of (y, block); the merged block is appended.
+        items: Output list of (y, block, markers); the blocks are appended.
         page: 1-based page number.
         headings: Current heading path.
-        footnotes: This page's notes, to resolve markers into amendments.
     """
-    if not pending:
-        return
-    markers = set().union(*(m for _, _, m in pending))
+    for y0, text, markers in pending:
+        block = ExtractedBlock(text=text, page=page, section_path=_path(headings))
+        items.append((y0, block, frozenset(markers)))
+    pending.clear()
+
+
+def _with_amendments(
+    block: ExtractedBlock, markers: frozenset[str], footnotes: dict[str, str]
+) -> ExtractedBlock:
+    """Attach the amendments a block's footnote markers point to.
+
+    Args:
+        block: A body-text block.
+        markers: Footnote numbers removed from its text.
+        footnotes: All notes of the page, number -> text.
+
+    Returns:
+        The block with ``amended_by`` set (unchanged if none apply).
+    """
     amended: list[str] = []
     for marker in sorted(markers, key=int):
         note = footnotes.get(marker, "")
         if AMENDMENT_RE.search(note):
             amended += [ref for ref in amendment_refs(note) if ref not in amended]
-    text = "\n".join(text for _, text, _ in pending)
-    block = ExtractedBlock(
-        text=text, page=page, section_path=_path(headings), amended_by=tuple(amended)
-    )
-    items.append((pending[0][0], block))
-    pending.clear()
+    return replace(block, amended_by=tuple(amended)) if amended else block
 
 
 def _push_heading(headings: list[tuple[int, str]], level: int, text: str) -> None:

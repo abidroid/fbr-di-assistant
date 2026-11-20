@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # Share of the page covered by images above which a low-text page is treated
     # as a screenshot and captioned by the small Claude model.
     caption_min_image_ratio: float = 0.4
+    # A page with a text layer whose image covers at least this share of it is
+    # a scan with OCR text: its font sizes follow the scan and mean nothing.
+    scanned_page_image_ratio: float = 0.9
     # A header/footer line repeated on more than this share of pages is removed.
     repeated_line_ratio: float = 0.5
     # Running headers/footers sit in the top/bottom 8% of a PDF page.
@@ -96,6 +99,9 @@ class Settings(BaseSettings):
     # Exact counts do not matter (BGE-M3 accepts 8192 tokens) and this keeps the
     # chunker free of a tokenizer download, so tests stay fast and offline.
     chars_per_token: int = 4
+    # A JSON sample stays whole up to this size (it is only useful complete);
+    # bigger ones are split like normal text. BGE-M3 reads up to 8192 tokens.
+    max_json_chunk_tokens: int = 2000
     # Texts embedded per model call: bigger is faster but uses more RAM.
     embed_batch_size: int = 16
     qdrant_collection: str = "fbr_di_final"
