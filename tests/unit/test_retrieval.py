@@ -144,7 +144,10 @@ def test_boosts_switched_off_keep_rerank_order() -> None:
     assert ranked[1].exact_match is False
 
 
-def test_threshold_uses_the_raw_rerank_score_not_the_boosted_one() -> None:
+def test_threshold_uses_the_raw_rerank_score_not_the_boosted_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "refusal_threshold", 0.30)
     # Boosted to 0.40 (above the 0.30 threshold), but the raw score is 0.20.
     weak = make_chunk(rerank_score=0.20, score=0.40)
     assert is_below_threshold([weak], best_rerank_score=0.20, config=RetrievalConfig())
@@ -279,6 +282,13 @@ async def test_reranker_reorders_and_top_k_is_respected(store: Retrievers) -> No
     assert isinstance(store.reranker, FakeReranker) and store.reranker.calls == 1
     scores = [chunk.rerank_score or 0.0 for chunk in result.chunks]
     assert scores == sorted(scores, reverse=True)
+
+
+async def test_only_rerank_candidates_reach_the_reranker(store: Retrievers) -> None:
+    config = RetrievalConfig(rerank_candidates=2, top_k=6, **NO_BOOSTS)
+    result = await retrieve("error code table", OWNER, store, config, COLLECTION)
+    assert len(result.chunks) == 2
+    assert all(chunk.rerank_score is not None for chunk in result.chunks)
 
 
 async def test_weak_match_is_flagged_below_threshold(store: Retrievers) -> None:

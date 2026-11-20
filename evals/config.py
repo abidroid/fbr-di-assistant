@@ -47,6 +47,7 @@ class RetrievalSection(BaseModel):
     Attributes:
         mode: ``dense``, ``bm25`` or ``hybrid``.
         rerank: Use the cross-encoder.
+        rerank_candidates: Fused candidates passed to the reranker.
         exact_boost: Boost exact code matches (needs rerank).
         authority_boost: Boost law over guidance (needs rerank).
         candidates: Results per search before reranking.
@@ -57,6 +58,7 @@ class RetrievalSection(BaseModel):
 
     mode: Literal["dense", "bm25", "hybrid"] = "hybrid"
     rerank: bool = True
+    rerank_candidates: int = Field(default_factory=lambda: settings.rerank_candidates)
     exact_boost: bool = True
     authority_boost: bool = True
     candidates: int = Field(default_factory=lambda: settings.candidates)

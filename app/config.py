@@ -129,8 +129,12 @@ class Settings(BaseSettings):
     # --- Retrieval ----------------------------------------------------------
     candidates: int = 30  # prefetch size for each of dense and bm25
     top_k: int = 6  # chunks passed to the LLM after reranking
-    # Below this best rerank score we refuse instead of answering (tuned on golden set).
-    refusal_threshold: float = 0.30
+    # Below this best raw rerank score retrieval refuses without calling the LLM.
+    # Tune-split sweep (2026-11-20): answerable and unanswerable scores overlap
+    # (correct answers scored as low as 0.06), so 0.30 refused 24% of answerable
+    # questions. 0.03 only refuses when retrieval finds essentially nothing; the
+    # LLM's "answerable" flag does the finer check. Re-tuned in Phase 6.
+    refusal_threshold: float = 0.03
     # RRF constant: score = sum of 1 / (k + rank). Qdrant's default is 2, which
     # lets a single list's rank 1 dominate; 60 (from the original RRF paper)
     # rewards chunks that rank well in BOTH the dense and the bm25 list.
@@ -151,9 +155,12 @@ class Settings(BaseSettings):
     # tokens; 1024 covers long rules without the cost of the model's 8192 max.
     rerank_max_tokens: int = 1024
     # Pairs scored per model call. A batch is padded to its longest pair, so on
-    # CPU large batches waste work (as measured for embed_batch_size); 8 is a
-    # starting point, timed in notebooks/04_retrieve.
-    rerank_batch_size: int = 8
+    # CPU bigger batches only add work: measured on 30 real pairs, batch 1 =
+    # 33 s, batch 8 = 51 s. Use 16-32 on a GPU.
+    rerank_batch_size: int = 1
+    # Fused candidates passed to the reranker (each pair costs ~1 s on CPU).
+    # 15 halves reranking time vs all 30; the eval checks that quality holds.
+    rerank_candidates: int = 15
 
     # --- LLM ----------------------------------------------------------------
     llm_model: str = "claude-sonnet-5-5"

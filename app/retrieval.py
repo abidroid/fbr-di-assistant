@@ -26,7 +26,7 @@ import anyio
 from qdrant_client import AsyncQdrantClient, models
 
 from app.config import settings
-from app.ingestion.embed import DenseEmbedder, SparseEmbedder, SparseVector
+from app.ingestion.embed import DenseEmbedder, SparseEmbedder, SparseVector, silence_progress_bars
 from app.ingestion.store import DENSE_VECTOR, SPARSE_VECTOR, with_retries
 
 # Files in the reranker repository that PyTorch inference does not need.
@@ -60,9 +60,11 @@ class BGEReranker:
         # Imported here: the import pulls in torch, which the tests never need.
         import torch
         from FlagEmbedding import FlagReranker
+        from FlagEmbedding.inference.reranker.encoder_only import base
         from huggingface_hub import snapshot_download
 
         torch.set_num_threads(settings.embed_threads or os.cpu_count() or 1)
+        silence_progress_bars(base)
         local_path = snapshot_download(settings.reranker_model, ignore_patterns=MODEL_SKIP)
         # fp16 speeds up GPUs but is slow or unsupported on CPU.
         self._model = FlagReranker(local_path, use_fp16=False, devices="cpu")
@@ -147,6 +149,8 @@ class RetrievalConfig:
         mode: ``dense`` (meaning only), ``bm25`` (words only) or ``hybrid``
             (both, fused with RRF).
         rerank: Rerank the candidates with the cross-encoder.
+        rerank_candidates: How many of the best fused candidates are reranked
+            (the rest are dropped). Each costs about 1 s on CPU.
         exact_boost: Lift chunks containing an exact code from the question.
         authority_boost: Lift law above guidance on near-ties.
         candidates: How many chunks each search returns before reranking.
@@ -155,6 +159,7 @@ class RetrievalConfig:
 
     mode: Mode = "hybrid"
     rerank: bool = True
+    rerank_candidates: int = field(default_factory=lambda: settings.rerank_candidates)
     exact_boost: bool = True
     authority_boost: bool = True
     candidates: int = field(default_factory=lambda: settings.candidates)
@@ -171,8 +176,8 @@ class RetrievalConfig:
         """
         if (self.exact_boost or self.authority_boost) and not self.rerank:
             raise ValueError("Boosts need rerank=true: they are added to rerank scores.")
-        if self.candidates < 1 or self.top_k < 1:
-            raise ValueError("candidates and top_k must be at least 1.")
+        if min(self.candidates, self.top_k, self.rerank_candidates) < 1:
+            raise ValueError("candidates, rerank_candidates and top_k must be at least 1.")
 
 
 @dataclass(frozen=True)
@@ -219,7 +224,7 @@ class RetrievalResult:
 
     Attributes:
         chunks: The final ``top_k`` chunks, best first.
-        best_rerank_score: Highest RAW rerank score among all candidates
+        best_rerank_score: Highest RAW rerank score among the reranked candidates
             (before boosts), or None when reranking is off or nothing was found.
         below_threshold: True when the system should refuse: nothing was found,
             or the best raw rerank score is under ``REFUSAL_THRESHOLD``.
@@ -292,7 +297,8 @@ async def retrieve(
     started = time.perf_counter()
     best_rerank_score: float | None = None
     if config.rerank and chunks:
-        chunks = await rerank(question, chunks, retrievers.reranker)
+        # Only the best fused candidates are worth the reranker's ~1 s each.
+        chunks = await rerank(question, chunks[: config.rerank_candidates], retrievers.reranker)
         best_rerank_score = max(chunk.rerank_score or 0.0 for chunk in chunks)
         chunks = apply_boosts(chunks, exact_tokens(question), config)
     timings["rerank"] = _ms_since(started)
