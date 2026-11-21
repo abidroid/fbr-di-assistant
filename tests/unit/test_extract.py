@@ -14,6 +14,7 @@ import pytest
 from app.exceptions import InvalidDocumentError
 from app.ingestion.caption import FakeCaptioner
 from app.ingestion.extract import (
+    ExtractedBlock,
     Extractor,
     amendment_refs,
     extract_text_file,
@@ -266,6 +267,23 @@ async def test_page_without_text_or_images_goes_to_ocr(monkeypatch: pytest.Monke
     assert asked == [[2]]
     assert result.warnings == ["Page 2: no text found, even with OCR."]
     assert [b.page for b in blocks] == [1]
+
+
+async def test_pages_read_by_ocr_get_a_check_the_original_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = pymupdf.open()
+    document.new_page().insert_textbox(pymupdf.Rect(72, 72, 540, 300), BODY)
+    document.new_page()  # stands in for a scanned page
+    monkeypatch.setattr(
+        Extractor,
+        "_ocr_pages",
+        lambda self, data, pages: [ExtractedBlock(text="OCR text", page=2, ocr=True)],
+    )
+    _, result, _ = await extract(pdf_bytes(document), "scan.pdf")
+    assert result.warnings == [
+        "Page(s) 2 were scanned images read with OCR; check answers from them against the original."
+    ]
 
 
 # --- Office files (real Docling; no ML models needed for these formats) ---------
