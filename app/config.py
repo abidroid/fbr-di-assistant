@@ -171,7 +171,8 @@ class Settings(BaseSettings):
     # The judge grades the answers in the evaluation. A different, stronger
     # model than the answerer, because a model tends to grade its own style kindly.
     judge_model: str = "claude-opus-5-5"
-    llm_timeout_s: int = 30
+    # Float so a tiny value (LLM_TIMEOUT_S=0.01) can demonstrate the 503 path.
+    llm_timeout_s: float = 30.0
     llm_max_retries: int = 3
     # No temperature: Sonnet 5.5 rejects it (400). Effort sets how much the
     # model reasons before answering; medium is enough to read six passages
@@ -191,14 +192,29 @@ class Settings(BaseSettings):
         "finishes processing), then ask about it."
     )
     legal_disclaimer: str = "This is not legal advice; check the cited rule."
+    # Input guardrail replies. Blocked (injection/jailbreak) is a 400 with a
+    # fixed message that tells an attacker nothing about which check fired.
+    blocked_message: str = (
+        "Sorry, I can't help with that request. Please ask a question about your documents."
+    )
+    off_topic_message: str = (
+        "I can only answer questions about your uploaded documents, such as FBR Digital "
+        "Invoicing rules, fields and error codes. Please ask about those."
+    )
+    # The verdict JSON is a few tokens; a small cap keeps the call cheap.
+    classifier_max_tokens: int = 64
     # Random marker in the system prompt; if it ever appears in an answer, the
     # prompt leaked. A fresh value per process is fine because it is never stored.
     prompt_canary: str = Field(default_factory=lambda: f"CANARY-{secrets.token_hex(8)}")
 
     # --- API ----------------------------------------------------------------
+    # Per user, on /ask (slowapi syntax). Each question costs model calls and
+    # ~20 s of CPU reranking, so one user must not be able to flood it.
     rate_limit: str = "20/minute"
     cors_origins: list[str] = ["http://localhost:5173"]
     log_level: str = "INFO"
+    # Attempts to open a database connection per request before answering 503.
+    db_max_retries: int = 3
     # A health check must answer quickly, so each dependency gets a short timeout.
     health_timeout_s: float = 3.0
 

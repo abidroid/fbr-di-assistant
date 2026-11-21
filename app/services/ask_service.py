@@ -1,11 +1,13 @@
 """Answer one question: the /ask use case.
 
-Flow: (no searchable documents -> fixed message) -> rewrite a follow-up ->
-retrieve -> refuse without an LLM call if retrieval is under the threshold ->
-generate a cited answer -> output leak check -> `AskResponse`.
+Flow: input guardrails (injection/jailbreak -> 400, off-topic -> polite
+refusal) -> (no searchable documents -> fixed message) -> rewrite a follow-up
+-> retrieve -> refuse without an LLM call if retrieval is under the threshold
+-> generate a cited answer -> output leak check -> `AskResponse`.
 
 `answer_question` needs no database, so the evaluation runs exactly the
-same pipeline as the API; `ask` adds the per-user document check.
+same pipeline as the API; `ask` adds the input guardrails and the per-user
+document check.
 """
 
 import logging
@@ -18,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import guardrails
 from app.config import settings
+from app.exceptions import GuardrailBlockedError
 from app.generation import (
     LLM,
     GenerationResult,
@@ -57,6 +60,7 @@ async def ask(
     request: AskRequest,
     retrievers: Retrievers,
     llm: LLM,
+    classifier: guardrails.InputClassifier,
     request_id: str,
 ) -> AskResponse:
     """Answer a user's question from their own documents.
@@ -67,21 +71,48 @@ async def ask(
         request: The question and optional history.
         retrievers: Embedders, reranker and Qdrant client.
         llm: The model client.
+        classifier: The input guardrail classifier.
         request_id: Id of this request, echoed in the response.
 
     Returns:
         A cited answer or a refusal.
 
     Raises:
+        GuardrailBlockedError: If the question is an injection or jailbreak (400).
         UpstreamUnavailableError: If Qdrant or Anthropic stay unavailable (503).
     """
     started = time.perf_counter()
+    user_turns = [turn.content for turn in request.history if turn.role == "user"]
+    verdict = await guardrails.check_input(request.question, user_turns, classifier)
+    guard_ms = _ms_since(started)
+    if verdict in ("injection", "jailbreak"):
+        # Log the kind only: the text is attacker-controlled and may be long.
+        logger.warning("Input guardrail blocked a question (%s)", verdict)
+        raise GuardrailBlockedError(settings.blocked_message)
+    if verdict == "off_topic":
+        # A fair request we cannot help with: a polite 200 refusal, like "not found".
+        return message_response(
+            settings.off_topic_message, request.question, request_id, guard_ms, _ms_since(started)
+        )
+
     if await count_ready_documents(session, user) == 0:
         # Say what is actually wrong instead of "I couldn't find this".
-        return empty_index_response(request.question, request_id, _ms_since(started))
+        return message_response(
+            settings.empty_index_message,
+            request.question,
+            request_id,
+            guard_ms,
+            _ms_since(started),
+        )
     history = [(turn.role, turn.content) for turn in request.history]
     outcome = await answer_question(
-        request.question, history, user.id, retrievers, llm, request_id=request_id
+        request.question,
+        history,
+        user.id,
+        retrievers,
+        llm,
+        request_id=request_id,
+        guardrails_ms=guard_ms,
     )
     return outcome.response
 
@@ -112,6 +143,7 @@ async def answer_question(
     request_id: str = "-",
     config: RetrievalConfig | None = None,
     collection: str | None = None,
+    guardrails_ms: float = 0.0,
 ) -> AskOutcome:
     """Run the full question-answering pipeline (no database needed).
 
@@ -124,6 +156,7 @@ async def answer_question(
         request_id: Id of this request, echoed in the response.
         config: Retrieval steps (defaults to the final system).
         collection: Qdrant collection (defaults to the app's).
+        guardrails_ms: Time the input checks already took (added to timings).
 
     Returns:
         The response plus the intermediate results.
@@ -150,7 +183,7 @@ async def answer_question(
 
     guard_started = time.perf_counter()
     answer = _check_leaks(answer)
-    guardrails_ms = _ms_since(guard_started)
+    guardrails_ms = round(guardrails_ms + _ms_since(guard_started), 1)
 
     timings = Timings(
         guardrails=guardrails_ms,
@@ -238,20 +271,26 @@ def build_response(
     )
 
 
-def empty_index_response(question: str, request_id: str, elapsed_ms: float) -> AskResponse:
-    """Build the response for a user with no searchable documents.
+def message_response(
+    message: str, question: str, request_id: str, guardrails_ms: float, elapsed_ms: float
+) -> AskResponse:
+    """Build a not-answerable response with a fixed message and no retrieval.
+
+    Used for off-topic questions and for users with no searchable documents.
 
     Args:
+        message: The fixed text to return as the answer.
         question: The question (for its language).
         request_id: Id of this request.
+        guardrails_ms: Time spent in the input checks.
         elapsed_ms: Time spent so far.
 
     Returns:
-        A not-answerable response with the empty-index message.
+        The response.
     """
     return AskResponse(
         request_id=request_id,
-        answer=settings.empty_index_message,
+        answer=message,
         answerable=False,
         language=detect_language(question),
         citations=[],
@@ -259,7 +298,7 @@ def empty_index_response(question: str, request_id: str, elapsed_ms: float) -> A
         chunk_count=0,
         retrieved_chunks=[],
         timings_ms=Timings(
-            guardrails=0.0, retrieval=0.0, rerank=0.0, generation=0.0, total=elapsed_ms
+            guardrails=guardrails_ms, retrieval=0.0, rerank=0.0, generation=0.0, total=elapsed_ms
         ),
     )
 

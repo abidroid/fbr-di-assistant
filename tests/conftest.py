@@ -32,6 +32,7 @@ from app import models  # noqa: E402, F401  # registers the tables on Base.metad
 from app.config import settings  # noqa: E402
 from app.db import Base, create_db_engine, get_db  # noqa: E402
 from app.deps import (  # noqa: E402
+    get_classifier,
     get_dense_embedder,
     get_extractor,
     get_llm,
@@ -41,6 +42,7 @@ from app.deps import (  # noqa: E402
     get_sparse_embedder,
 )
 from app.generation import FakeLLM  # noqa: E402
+from app.guardrails import FakeClassifier, limiter  # noqa: E402
 from app.ingestion.caption import FakeCaptioner  # noqa: E402
 from app.ingestion.embed import FakeEmbedder, FakeSparseEmbedder  # noqa: E402
 from app.ingestion.extract import Extractor  # noqa: E402
@@ -161,6 +163,18 @@ def fake_llm() -> FakeLLM:
     return FakeLLM()
 
 
+@pytest.fixture
+def classifier() -> FakeClassifier:
+    """Input classifier that says "ok"; a test sets ``.label`` to change it."""
+    return FakeClassifier()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limit() -> None:
+    """Start every test with empty rate-limit counters (they live in memory)."""
+    limiter.reset()
+
+
 @pytest.fixture(autouse=True)
 def upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Store every test's uploaded files in its own temporary folder."""
@@ -176,6 +190,7 @@ async def db_client(
     fake_dense: FakeEmbedder,
     captioner: FakeCaptioner,
     fake_llm: FakeLLM,
+    classifier: FakeClassifier,
 ) -> AsyncIterator[httpx.AsyncClient]:
     """Yield an HTTP client for an app that uses the real test database.
 
@@ -197,6 +212,7 @@ async def db_client(
     application.dependency_overrides[get_sparse_embedder] = FakeSparseEmbedder
     application.dependency_overrides[get_reranker] = FakeReranker
     application.dependency_overrides[get_llm] = lambda: fake_llm
+    application.dependency_overrides[get_classifier] = lambda: classifier
     application.dependency_overrides[get_session_factory] = lambda: db_sessionmaker
     transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:

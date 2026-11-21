@@ -218,6 +218,14 @@ class Extractor:
             warnings += [
                 f"Page {p}: no text found, even with OCR." for p in scan.ocr_pages if p not in read
             ]
+            if read:
+                # OCR misreads characters (0 vs O, 5 vs S), which matters for
+                # codes and amounts, so the user is told which pages to double-check.
+                pages = ", ".join(str(p) for p in sorted(p for p in read if p is not None))
+                warnings.append(
+                    f"Page(s) {pages} were scanned images read with OCR; check answers "
+                    "from them against the original."
+                )
         if scan.caption_pages:
             blocks.extend(await self._caption_pages(file, scan.caption_pages))
 

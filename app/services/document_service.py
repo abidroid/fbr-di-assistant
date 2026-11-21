@@ -19,8 +19,9 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -128,26 +129,29 @@ async def upload_document(
     data = await read_limited(upload)
     # Unzipping a 25 MB DOCX to check for a zip bomb is CPU work.
     file = await anyio.to_thread.run_sync(validate_file, data, filename)
-    await _refuse_duplicate(session, user, file.sha256)
-
-    document = Document(
-        owner_id=user.id,
-        filename=file.filename,
-        file_type=file.file_type,
-        size_bytes=len(file.data),
-        sha256=file.sha256,
-        status=DocumentStatus.PROCESSING,
-        pages=file.page_count,
-    )
-    session.add(document)
-    try:
-        await session.commit()
-    except IntegrityError:
-        # Two identical uploads at once both passed the check; the unique
-        # constraint stopped the second one.
-        await session.rollback()
+    # Without the lock, two identical uploads at the same instant both pass the
+    # duplicate check. With it, the second waits until the first row is saved,
+    # then sees it and gets 409.
+    async with _upload_lock(user.id, file.sha256):
         await _refuse_duplicate(session, user, file.sha256)
-        raise
+        document = Document(
+            owner_id=user.id,
+            filename=file.filename,
+            file_type=file.file_type,
+            size_bytes=len(file.data),
+            sha256=file.sha256,
+            status=DocumentStatus.PROCESSING,
+            pages=file.page_count,
+        )
+        session.add(document)
+        try:
+            await session.commit()
+        except IntegrityError:
+            # The lock only covers this process; with several API processes the
+            # unique constraint is the backstop that stops the second upload.
+            await session.rollback()
+            await _refuse_duplicate(session, user, file.sha256)
+            raise
     path = file_path(user.id, document.id, file.file_type)
 
     try:
@@ -167,7 +171,12 @@ async def upload_document(
     try:
         document.chunk_count = await embed_and_store(chunks, meta, pipeline)
     except Exception:
-        await delete_document_points(pipeline.qdrant, document.id)
+        try:
+            await delete_document_points(pipeline.qdrant, document.id)
+        except Exception:
+            # Qdrant is probably the thing that failed; the row and file must
+            # still go, or the user is blocked by a "duplicate" that never worked.
+            logger.exception("Could not remove partial vectors of document %s", document.id)
         await _discard(session, document, path)
         raise
     document.status = DocumentStatus.READY
@@ -315,6 +324,42 @@ async def _set_status(
             document.chunk_count = chunk_count
         await session.commit()
         return True
+
+
+@dataclass
+class _KeyLock:
+    """A lock plus how many uploads hold or wait for it (to know when to drop it)."""
+
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    users: int = 0
+
+
+# One entry per (owner, file hash) being uploaded right now; removed when free,
+# so the dict never grows with the number of past uploads.
+_upload_locks: dict[tuple[uuid.UUID, str], _KeyLock] = {}
+
+
+@asynccontextmanager
+async def _upload_lock(owner_id: uuid.UUID, sha256: str) -> AsyncIterator[None]:
+    """Let only one upload of the same file by the same user run the duplicate check.
+
+    Args:
+        owner_id: The uploader.
+        sha256: Hash of the file.
+
+    Yields:
+        Control while the lock is held.
+    """
+    key = (owner_id, sha256)
+    entry = _upload_locks.setdefault(key, _KeyLock())
+    entry.users += 1
+    try:
+        async with entry.lock:
+            yield
+    finally:
+        entry.users -= 1
+        if entry.users == 0:
+            del _upload_locks[key]
 
 
 async def _refuse_duplicate(session: AsyncSession, user: User, sha256: str) -> None:

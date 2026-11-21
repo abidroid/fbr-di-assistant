@@ -76,7 +76,7 @@ async def upload_document(
     description="Returns every document you uploaded, newest first, with its ingestion status.",
     response_model=list[DocumentRead],
     status_code=status.HTTP_200_OK,
-    responses=error_responses(401),
+    responses=error_responses(401, 503),
 )
 async def list_documents(session: SessionDep, user: CurrentUser) -> list[Document]:
     """List the user's documents.
@@ -100,7 +100,7 @@ async def list_documents(session: SessionDep, user: CurrentUser) -> list[Documen
     ),
     response_model=DocumentRead,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(401, 404, 422),
+    responses=error_responses(401, 404, 422, 503),
 )
 async def get_document(doc_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Document:
     """Return one of the user's documents.

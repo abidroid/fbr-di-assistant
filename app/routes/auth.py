@@ -23,7 +23,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     ),
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(409, 422),
+    responses=error_responses(409, 422, 503),
 )
 async def signup(data: UserCreate, session: SessionDep) -> User:
     """Create a user account.
@@ -48,7 +48,7 @@ async def signup(data: UserCreate, session: SessionDep) -> User:
     ),
     response_model=Token,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(401, 422),
+    responses=error_responses(401, 422, 503),
 )
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
@@ -71,7 +71,7 @@ async def login(
     description="Returns the account that owns the bearer token. Requires a valid token.",
     response_model=UserRead,
     status_code=status.HTTP_200_OK,
-    responses=error_responses(401),
+    responses=error_responses(401, 503),
 )
 async def me(user: CurrentUser) -> User:
     """Return the logged-in user.

@@ -1,9 +1,11 @@
 """Async database setup for Neon PostgreSQL: engine, session factory, Base, get_db()."""
 
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -11,8 +13,22 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from tenacity import (
+    AsyncRetrying,
+    RetryError,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import settings
+from app.exceptions import UpstreamUnavailableError
+
+logger = logging.getLogger(__name__)
+
+# Errors that mean "could not reach the database", worth another try: Neon may
+# be waking from suspend or the network may have blipped.
+CONNECTION_ERRORS = (OperationalError, InterfaceError, OSError, TimeoutError)
 
 
 def to_asyncpg_url(raw_url: str) -> URL:
@@ -74,3 +90,33 @@ async def get_db() -> AsyncIterator[AsyncSession]:
     """
     async with SessionLocal() as session:
         yield session
+
+
+async def connect_with_retries(session: AsyncSession) -> None:
+    """Open the session's connection now, retrying with exponential backoff.
+
+    A session normally connects lazily on its first query, in the middle of a
+    service; connecting up front (`deps.get_session`) means a Neon outage is
+    retried here, in one place, and turns into a clean 503 before any work is
+    done. /health skips this: it has its own short timeout per dependency.
+
+    Args:
+        session: The new session.
+
+    Raises:
+        UpstreamUnavailableError: If the database is still unreachable after
+            ``settings.db_max_retries`` attempts (503).
+    """
+    retrying = AsyncRetrying(
+        retry=retry_if_exception_type(CONNECTION_ERRORS),
+        stop=stop_after_attempt(settings.db_max_retries),
+        wait=wait_exponential(multiplier=0.5, max=4),
+        reraise=False,
+    )
+    try:
+        async for attempt in retrying:
+            with attempt:
+                await session.connection()
+    except RetryError as exc:
+        logger.warning("Database unreachable after %d attempts", settings.db_max_retries)
+        raise UpstreamUnavailableError() from exc

@@ -325,7 +325,8 @@ def build_user_prompt(question: str, chunks: Sequence[RetrievedChunk]) -> str:
     """Wrap the chunks in numbered document blocks, then add the question.
 
     Document text is XML-escaped, so a document containing ``</document>``
-    cannot close its own block and smuggle text outside it.
+    cannot close its own block and smuggle text outside it. The question is
+    escaped too, so it cannot forge a ``<document>`` block for the model to cite.
 
     Args:
         question: The (standalone) question.
@@ -335,11 +336,15 @@ def build_user_prompt(question: str, chunks: Sequence[RetrievedChunk]) -> str:
         The user message.
     """
     blocks = [_document_block(n, chunk) for n, chunk in enumerate(chunks, start=1)]
-    return "\n\n".join(blocks) + f"\n\nQuestion: {question}"
+    return "\n\n".join(blocks) + f"\n\nQuestion: {html.escape(question, quote=False)}"
 
 
 def _document_block(n: int, chunk: RetrievedChunk) -> str:
-    """Format one chunk as ``<document n=".." source=".." section="..">``."""
+    """Format one chunk as ``<document n=".." source=".." section=".." date="..">``.
+
+    ``date`` is present only when the source's version date is known; prompt
+    rule 6 uses it to treat the later of two disagreeing documents as current.
+    """
     pages = (
         f"p.{chunk.page_start}"
         if chunk.page_end == chunk.page_start
@@ -348,7 +353,8 @@ def _document_block(n: int, chunk: RetrievedChunk) -> str:
     source = html.escape(f"{chunk.filename} {pages}", quote=True)
     section = html.escape(" > ".join(chunk.section_path), quote=True)
     body = html.escape(chunk.text, quote=False)
-    return f'<document n="{n}" source="{source}" section="{section}">\n{body}\n</document>'
+    date = f' date="{html.escape(chunk.version_date, quote=True)}"' if chunk.version_date else ""
+    return f'<document n="{n}" source="{source}" section="{section}"{date}>\n{body}\n</document>'
 
 
 def build_rewrite_prompt(question: str, history: Sequence[tuple[str, str]]) -> str:
