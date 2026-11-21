@@ -200,6 +200,8 @@ class RetrievedChunk:
         exact_match: The chunk contains an exact code from the question.
         score: The value the final order is sorted by.
         rank: Position in the final list, 1 = best.
+        version_date: Date the source text is valid for (ISO), if known; shown
+            to the model so it can tell which of two disagreeing documents is newer.
     """
 
     chunk_id: str
@@ -216,6 +218,7 @@ class RetrievedChunk:
     exact_match: bool
     score: float
     rank: int
+    version_date: str | None = None
 
 
 @dataclass(frozen=True)
@@ -448,6 +451,7 @@ def to_chunk(point: models.ScoredPoint, query_vector: list[float], rank: int) ->
         exact_match=False,
         score=point.score,
         rank=rank,
+        version_date=payload.get("version_date"),
     )
 
 
