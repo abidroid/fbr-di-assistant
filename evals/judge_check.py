@@ -28,6 +28,15 @@ SAMPLE_SIZE = 20
 # A fixed seed, so the same results file always gives the same 20 answers.
 SEED = 35
 LABELS = {"c": "correct", "p": "partly", "w": "wrong"}
+# The same scale the judge uses (evals/judge.py VERDICT_PROMPT). The reference
+# answer is the ground truth, so labelling needs no FBR knowledge: compare the
+# answer with the reference fact by fact. A fluent answer is not a correct one.
+RUBRIC = """\
+Compare the ANSWER with the REFERENCE, fact by fact (codes, numbers, limits, names):
+  c = correct: has the key facts of the reference and nothing that contradicts it
+  p = partly:  some key facts right, but an important one is missing or muddled
+  w = wrong:   key facts missing or contradicted, or a refusal when the reference has an answer
+Unanswerable questions: a refusal is correct; any other answer is wrong."""
 
 
 def select_sample(
@@ -125,7 +134,8 @@ def ask_label(question: dict[str, Any], number: int, total: int) -> str:
     """
     retrieval = question["retrieval"]
     print("\n" + "=" * 80)
-    print(f"[{number}/{total}] {retrieval['id']} ({retrieval['category']})")
+    print(f"[{number}/{total}] {retrieval['id']} ({retrieval['category']})\n")
+    print(RUBRIC)
     print(f"\nQUESTION:  {retrieval['question']}")
     print(f"\nREFERENCE: {question['reference']}")
     print(f"\nANSWER:\n{question['answer']}")
