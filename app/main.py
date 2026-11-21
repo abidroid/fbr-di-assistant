@@ -6,6 +6,7 @@ by the handlers registered here, the only place that maps errors to statuses.
 """
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -16,12 +17,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.db import engine
-from app.exceptions import DomainError
+from app.exceptions import DomainError, UpstreamUnavailableError
 from app.generation import ClaudeLLM
+from app.guardrails import LLMClassifier, limiter
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
@@ -61,6 +65,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.extractor = Extractor(ClaudeCaptioner())
     # One Anthropic client for every /ask request (it pools connections).
     app.state.llm = ClaudeLLM()
+    # The input guardrail shares that client; it only asks a different model.
+    app.state.classifier = LLMClassifier(app.state.llm)
     try:
         await ensure_collection(app.state.qdrant)
     except Exception:
@@ -136,6 +142,64 @@ async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return error_response(request, exc.status_code, code, message, exc.headers)
 
 
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Answer 429 in our error shape, with ``Retry-After`` in seconds.
+
+    Args:
+        request: The refused request.
+        exc: slowapi's `RateLimitExceeded`.
+
+    Returns:
+        A 429 error response.
+    """
+    assert isinstance(exc, RateLimitExceeded)
+    return error_response(
+        request,
+        429,
+        "rate_limited",
+        f"Too many questions: the limit is {exc.detail}. Please wait and try again.",
+        headers={"Retry-After": str(_retry_after_seconds(request, exc))},
+    )
+
+
+def _retry_after_seconds(request: Request, exc: RateLimitExceeded) -> int:
+    """Seconds until the user's window resets.
+
+    Args:
+        request: The refused request; slowapi stored the limit and key on it.
+        exc: The rate-limit error.
+
+    Returns:
+        Seconds to wait (at least 1). Falls back to the window length if the
+        counter cannot be read.
+    """
+    try:
+        limit, keys = request.state.view_rate_limit
+        reset_at, _remaining = limiter.limiter.get_window_stats(limit, *keys)
+        return max(1, int(reset_at - time.time()) + 1)
+    except Exception:
+        return int(exc.limit.limit.get_expiry())
+
+
+async def database_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Turn a lost database connection in the middle of a request into a 503.
+
+    `get_db` already retries opening the connection; this catches a failure
+    later in the request (Neon suspended, network dropped), which is not the
+    client's fault and may work again shortly, so 503 rather than 500.
+
+    Args:
+        request: The failed request.
+        exc: SQLAlchemy's `OperationalError` or `InterfaceError`.
+
+    Returns:
+        The standard 503 error response.
+    """
+    logger.warning("Database unavailable during the request", exc_info=exc)
+    error = UpstreamUnavailableError()
+    return error_response(request, error.status_code, error.code, error.message)
+
+
 async def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Turn request validation failures into a 422 in our shape.
 
@@ -200,7 +264,14 @@ def create_app() -> FastAPI:
     # Added last, so it is the outermost layer and also times CORS preflights.
     app.add_middleware(RequestIdMiddleware)
 
+    # slowapi reads the limiter from app.state.
+    app.state.limiter = limiter
     app.add_exception_handler(DomainError, domain_error_handler)
+    # RateLimitExceeded subclasses HTTPException; Starlette picks the most
+    # specific handler, so this one wins over the generic HTTP handler below.
+    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+    app.add_exception_handler(OperationalError, database_error_handler)
+    app.add_exception_handler(InterfaceError, database_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

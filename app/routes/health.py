@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Response, status
 
-from app.deps import QdrantDep, SessionDep
+from app.deps import LazySessionDep, QdrantDep
 from app.schemas import HealthResponse
 from app.services import health_service
 
@@ -26,7 +26,7 @@ router = APIRouter(tags=["health"])
         }
     },
 )
-async def health(session: SessionDep, qdrant: QdrantDep, response: Response) -> HealthResponse:
+async def health(session: LazySessionDep, qdrant: QdrantDep, response: Response) -> HealthResponse:
     """Run the health checks and set 503 if any failed.
 
     Args:

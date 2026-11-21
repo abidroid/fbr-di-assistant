@@ -12,9 +12,10 @@ from fastapi.security import OAuth2PasswordBearer
 from qdrant_client import AsyncQdrantClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import SessionLocal, get_db
+from app.db import SessionLocal, connect_with_retries, get_db
 from app.exceptions import InvalidCredentialsError
 from app.generation import LLM
+from app.guardrails import InputClassifier
 from app.ingestion.embed import DenseEmbedder, SparseEmbedder
 from app.ingestion.extract import Extractor
 from app.models import User
@@ -40,7 +41,26 @@ def get_qdrant(request: Request) -> AsyncQdrantClient:
     return request.app.state.qdrant
 
 
-SessionDep = Annotated[AsyncSession, Depends(get_db)]
+async def get_session(session: Annotated[AsyncSession, Depends(get_db)]) -> AsyncSession:
+    """Return the request's session with its connection already open.
+
+    Args:
+        session: The session from `get_db` (tests override `get_db`).
+
+    Returns:
+        The connected session.
+
+    Raises:
+        UpstreamUnavailableError: If Neon stays unreachable after retries (503).
+    """
+    await connect_with_retries(session)
+    return session
+
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# Without the up-front connect: /health measures the database itself, under
+# its own short timeout, and must report "error" rather than fail with 503.
+LazySessionDep = Annotated[AsyncSession, Depends(get_db)]
 QdrantDep = Annotated[AsyncQdrantClient, Depends(get_qdrant)]
 
 
@@ -73,6 +93,14 @@ def get_llm(request: Request) -> LLM:
 
 
 LLMDep = Annotated[LLM, Depends(get_llm)]
+
+
+def get_classifier(request: Request) -> InputClassifier:
+    """Return the input guardrail classifier created once in the lifespan."""
+    return request.app.state.classifier
+
+
+ClassifierDep = Annotated[InputClassifier, Depends(get_classifier)]
 
 
 def get_retrievers(
