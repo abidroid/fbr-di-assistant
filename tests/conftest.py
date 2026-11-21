@@ -34,11 +34,13 @@ from app.db import Base, create_db_engine, get_db  # noqa: E402
 from app.deps import (  # noqa: E402
     get_dense_embedder,
     get_extractor,
+    get_llm,
     get_qdrant,
     get_reranker,
     get_session_factory,
     get_sparse_embedder,
 )
+from app.generation import FakeLLM  # noqa: E402
 from app.ingestion.caption import FakeCaptioner  # noqa: E402
 from app.ingestion.embed import FakeEmbedder, FakeSparseEmbedder  # noqa: E402
 from app.ingestion.extract import Extractor  # noqa: E402
@@ -153,6 +155,12 @@ def captioner() -> FakeCaptioner:
     return FakeCaptioner()
 
 
+@pytest.fixture
+def fake_llm() -> FakeLLM:
+    """LLM with no scripted replies; a test adds the replies it expects."""
+    return FakeLLM()
+
+
 @pytest.fixture(autouse=True)
 def upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Store every test's uploaded files in its own temporary folder."""
@@ -167,11 +175,13 @@ async def db_client(
     qdrant: AsyncQdrantClient,
     fake_dense: FakeEmbedder,
     captioner: FakeCaptioner,
+    fake_llm: FakeLLM,
 ) -> AsyncIterator[httpx.AsyncClient]:
     """Yield an HTTP client for an app that uses the real test database.
 
     Ingestion uses the real extractor and chunker, but fake embedders, a fake
-    captioner and in-memory Qdrant: no model is loaded, no API is called.
+    captioner, a fake reranker, a fake LLM and in-memory Qdrant: no model is
+    loaded, no API is called.
     """
     application = create_app()
 
@@ -186,6 +196,7 @@ async def db_client(
     application.dependency_overrides[get_dense_embedder] = lambda: fake_dense
     application.dependency_overrides[get_sparse_embedder] = FakeSparseEmbedder
     application.dependency_overrides[get_reranker] = FakeReranker
+    application.dependency_overrides[get_llm] = lambda: fake_llm
     application.dependency_overrides[get_session_factory] = lambda: db_sessionmaker
     transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:

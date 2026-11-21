@@ -33,3 +33,6 @@ frontend/dist/
 
 # Evaluation extraction cache (OCR + paid captions, rebuilt on demand)
 evals/cache/
+
+# Partial results of an interrupted full eval run (resumed, then deleted)
+evals/results/*.checkpoint.jsonl

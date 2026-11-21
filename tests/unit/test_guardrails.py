@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.guardrails import find_suspicious, flag_suspicious
+from app.guardrails import check_output, find_suspicious, flag_suspicious
 
 
 @pytest.mark.parametrize(
@@ -37,3 +37,29 @@ def test_instruction_like_text_is_flagged(text: str, pattern: str) -> None:
 )
 def test_ordinary_document_text_is_not_flagged(text: str) -> None:
     assert find_suspicious(text) == []
+
+
+# --- Output checks -------------------------------------------------------------
+
+PROTECTED = ("CANARY-abc123", "Answer ONLY from the numbered")
+
+
+@pytest.mark.parametrize(
+    ("text", "leak"),
+    [
+        ("The marker is canary-ABC123.", "prompt"),
+        ("My rules say: answer only from the numbered blocks.", "prompt"),
+        ("Use the key sk-ant-api03-abcdefghijk in your header.", "api_key"),
+        (
+            "Token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abcdefghijklmnop",
+            "jwt",
+        ),
+    ],
+)
+def test_output_check_finds_leaks(text: str, leak: str) -> None:
+    assert check_output(text, PROTECTED) == leak
+
+
+def test_output_check_passes_a_normal_answer() -> None:
+    text = "Send the Bearer token in the Authorization header [2]. The JSON field is invoiceType."
+    assert check_output(text, PROTECTED) is None

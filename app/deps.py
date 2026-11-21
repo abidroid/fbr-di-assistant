@@ -14,10 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import SessionLocal, get_db
 from app.exceptions import InvalidCredentialsError
+from app.generation import LLM
 from app.ingestion.embed import DenseEmbedder, SparseEmbedder
 from app.ingestion.extract import Extractor
 from app.models import User
-from app.retrieval import Reranker
+from app.retrieval import Reranker, Retrievers
 from app.services import auth_service
 from app.services.document_service import Pipeline
 
@@ -64,6 +65,37 @@ def get_reranker(request: Request) -> Reranker:
 
 
 RerankerDep = Annotated[Reranker, Depends(get_reranker)]
+
+
+def get_llm(request: Request) -> LLM:
+    """Return the Anthropic client wrapper created once in the lifespan."""
+    return request.app.state.llm
+
+
+LLMDep = Annotated[LLM, Depends(get_llm)]
+
+
+def get_retrievers(
+    dense: Annotated[DenseEmbedder, Depends(get_dense_embedder)],
+    sparse: Annotated[SparseEmbedder, Depends(get_sparse_embedder)],
+    reranker: RerankerDep,
+    qdrant: QdrantDep,
+) -> Retrievers:
+    """Bundle everything retrieval needs into one object.
+
+    Args:
+        dense: Dense embedder.
+        sparse: Sparse embedder.
+        reranker: Cross-encoder.
+        qdrant: Vector database client.
+
+    Returns:
+        The retrievers.
+    """
+    return Retrievers(dense=dense, sparse=sparse, reranker=reranker, qdrant=qdrant)
+
+
+RetrieversDep = Annotated[Retrievers, Depends(get_retrievers)]
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:

@@ -43,7 +43,7 @@ Prefer clear, conventional code over clever code, and follow the Teaching mode r
 | Sparse / keyword | BM25 sparse vectors via fastembed `Qdrant/bm25` (IDF modifier in Qdrant) |
 | Vector DB | Qdrant, one collection per config, named vectors `dense` + `bm25`, HNSW m=16 ef_construct=100, payload indexes on owner_id, doc_id, superseded |
 | Retrieval | Prefetch dense top 30 + bm25 top 30 -> RRF fusion -> rerank with bge-reranker-v2-m3 -> top_k=6; exact-token boost for codes like 0052, SN009, 150XF; authority boost law > official_guidance > third_party; refusal if best rerank score < REFUSAL_THRESHOLD (start 0.30, tune on golden set) |
-| LLM | Anthropic API, `claude-sonnet-5-5` for answers (temperature 0), `claude-haiku-5-5` for follow-up rewrite, captions and guardrail classification. AsyncAnthropic client, 30 s timeout, 3 retries |
+| LLM | Anthropic API, `claude-sonnet-5-5` for answers (no temperature: Sonnet 5.5 rejects it; effort medium + structured JSON output), `claude-haiku-5-5` for follow-up rewrite, captions and guardrail classification, `claude-opus-5-5` as the evaluation judge. AsyncAnthropic client, 30 s timeout, 3 retries |
 | Framework | Plain Anthropic SDK + own modules. LangChain only for text splitters. No-code builders are banned |
 | Relational DB | Neon PostgreSQL via SQLAlchemy 2.0 async + asyncpg + Alembic: `users`, `documents` |
 | Auth | Signup/login, JWT (PyJWT HS256), pwdlib argon2 hashing; every document and ask endpoint requires a token |

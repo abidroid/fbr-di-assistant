@@ -133,7 +133,10 @@ class Settings(BaseSettings):
     # Tune-split sweep (2026-11-20): answerable and unanswerable scores overlap
     # (correct answers scored as low as 0.06), so 0.30 refused 24% of answerable
     # questions. 0.03 only refuses when retrieval finds essentially nothing; the
-    # LLM's "answerable" flag does the finer check. Re-tuned in Phase 6.
+    # LLM's "answerable" flag does the finer check. Confirmed in Phase 6 on real
+    # answers (evals/results/2026-11-20_final_full.md): at 0.03 the model already
+    # refused 5/5 unanswerable questions with 4% false refusals; 0.10 would add
+    # 12 points of false refusals and catch no extra unanswerable question.
     refusal_threshold: float = 0.03
     # RRF constant: score = sum of 1 / (k + rank). Qdrant's default is 2, which
     # lets a single list's rank 1 dominate; 60 (from the original RRF paper)
@@ -165,8 +168,29 @@ class Settings(BaseSettings):
     # --- LLM ----------------------------------------------------------------
     llm_model: str = "claude-sonnet-5-5"
     small_model: str = "claude-haiku-5-5"
+    # The judge grades the answers in the evaluation. A different, stronger
+    # model than the answerer, because a model tends to grade its own style kindly.
+    judge_model: str = "claude-opus-5-5"
     llm_timeout_s: int = 30
     llm_max_retries: int = 3
+    # No temperature: Sonnet 5.5 rejects it (400). Effort sets how much the
+    # model reasons before answering; medium is enough to read six passages
+    # and cite them, low is enough to rewrite a follow-up question.
+    answer_effort: Literal["low", "medium", "high"] = "medium"
+    rewrite_effort: Literal["low", "medium", "high"] = "low"
+    # Caps on generated tokens. An answer with citations and background is far
+    # below 4096; a cap stops a runaway reply from costing more than it should.
+    answer_max_tokens: int = 4096
+    rewrite_max_tokens: int = 512
+    # Earlier turns sent with a follow-up question (user + assistant messages).
+    history_max_turns: int = 6
+    # Fixed texts, so the frontend and the evaluation can recognise them exactly.
+    refusal_message: str = "I couldn't find this in your documents."
+    empty_index_message: str = (
+        "You don't have any searchable documents yet. Upload a document (or wait until it "
+        "finishes processing), then ask about it."
+    )
+    legal_disclaimer: str = "This is not legal advice; check the cited rule."
     # Random marker in the system prompt; if it ever appears in an answer, the
     # prompt leaked. A fresh value per process is fine because it is never stored.
     prompt_canary: str = Field(default_factory=lambda: f"CANARY-{secrets.token_hex(8)}")
