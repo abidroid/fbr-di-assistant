@@ -14,6 +14,12 @@ the API uses (retrieval + generation), then grades each answer with
 ``evals/judge.py`` and writes ``<date>_<config>_full.json`` and ``.md``:
 
     uv run python -m evals.run_eval --config final --stage full --split tune
+
+Every report has per-language tables and an English-vs-Urdu table over the
+translated questions. ``--language ur`` reruns just the Urdu questions and
+their English originals, into files tagged ``_ur``:
+
+    uv run python -m evals.run_eval --config final --stage full --split all --language ur
 """
 
 import argparse
@@ -86,6 +92,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--split", choices=["tune", "heldout", "all"], default="tune")
     parser.add_argument(
+        "--language",
+        choices=["all", "en", "ur"],
+        default="all",
+        help="ur: the Urdu questions plus the English originals they translate (for the "
+        "English-vs-Urdu table), so the Urdu results can be rerun cheaply.",
+    )
+    parser.add_argument(
         "--stage",
         choices=["retrieval", "full"],
         default="retrieval",
@@ -116,20 +129,29 @@ def select_configs(names: list[str]) -> list[EvalConfig]:
     return [load_config(name) for name in names]
 
 
-def select_questions(split: str) -> list[GoldenQuestion]:
-    """Return the golden questions of a split.
+def select_questions(split: str, language: str = "all") -> list[GoldenQuestion]:
+    """Return the golden questions of a split and language.
 
     The held-out split is only for the final report: tuning on it would make
     its numbers meaningless.
 
     Args:
         split: ``tune``, ``heldout`` or ``all``.
+        language: ``all``, ``en``, or ``ur`` (Urdu questions plus the English
+            originals they translate, so every translation has its pair).
 
     Returns:
-        The questions.
+        The questions, in file order.
     """
     questions = load_golden_set()
-    return questions if split == "all" else [q for q in questions if q.split == split]
+    if split != "all":
+        questions = [q for q in questions if q.split == split]
+    if language == "en":
+        return [q for q in questions if q.language == "en"]
+    if language == "ur":
+        originals = {q.translation_of for q in questions if q.language == "ur"}
+        return [q for q in questions if q.language == "ur" or q.id in originals]
+    return questions
 
 
 def to_result(question: GoldenQuestion, found: RetrievalResult, k: int) -> QuestionResult:
@@ -150,6 +172,8 @@ def to_result(question: GoldenQuestion, found: RetrievalResult, k: int) -> Quest
         category=question.category.value,
         answerable=question.answerable,
         question=question.question,
+        language=question.language,
+        translation_of=question.translation_of,
         expected=[f"{s.doc} p.{','.join(map(str, s.pages))}" for s in question.sources],
         hit=hit,
         recall=recall,
@@ -330,11 +354,14 @@ async def answer_and_grade(
         unsupported_claims=score.unsupported_claims,
         generation_ms=response.timings_ms.generation,
         total_ms=response.timings_ms.total,
+        # response.language comes from the answer's script (generation code),
+        # so this catches a model that ignores rule 7 and answers in English.
+        language_match=None if not response.answerable else response.language == question.language,
     )
 
 
 def write_full_report(
-    config: EvalConfig, split: str, results: list[AnswerResult], stamp: str
+    config: EvalConfig, split: str, results: list[AnswerResult], stamp: str, tag: str = ""
 ) -> dict[str, object]:
     """Save the full stage's JSON and Markdown results.
 
@@ -343,6 +370,8 @@ def write_full_report(
         split: The split used.
         results: Per-question results.
         stamp: Date prefix for the file names.
+        tag: File-name suffix for a partial run (e.g. ``_ur``), so it never
+            overwrites the report of a full run.
 
     Returns:
         The answer summary.
@@ -365,7 +394,7 @@ def write_full_report(
         "threshold_sweep": sweep,
         "questions": [asdict(result) for result in results],
     }
-    base = RESULTS_DIR / f"{stamp}_{config.name}_full"
+    base = RESULTS_DIR / f"{stamp}_{config.name}{tag}_full"
     base.with_suffix(".json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     markdown = answers_markdown(
         config.name,
@@ -381,7 +410,7 @@ def write_full_report(
 
 
 def write_config_report(
-    config: EvalConfig, split: str, results: list[QuestionResult], stamp: str
+    config: EvalConfig, split: str, results: list[QuestionResult], stamp: str, tag: str = ""
 ) -> dict[str, object]:
     """Save one config's JSON and Markdown results.
 
@@ -390,6 +419,7 @@ def write_config_report(
         split: The split used.
         results: Per-question results.
         stamp: Date prefix for the file names.
+        tag: File-name suffix for a partial run (see `write_full_report`).
 
     Returns:
         The summary (for the comparison table).
@@ -414,7 +444,7 @@ def write_config_report(
         "threshold_sweep": sweep,
         "questions": [asdict(result) for result in results],
     }
-    base = RESULTS_DIR / f"{stamp}_{config.name}"
+    base = RESULTS_DIR / f"{stamp}_{config.name}{tag}"
     base.with_suffix(".json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     markdown = config_markdown(
         config.name,
@@ -439,9 +469,13 @@ async def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.WARNING)
     args = parse_args(argv)
     configs = select_configs(args.config)
-    questions = select_questions(args.split)
+    questions = select_questions(args.split, args.language)
     stamp = date.today().isoformat()
-    print(f"{len(questions)} {args.split} questions, configs: {[c.name for c in configs]}")
+    tag = "" if args.language == "all" else f"_{args.language}"
+    print(
+        f"{len(questions)} {args.split} questions (language {args.language}), "
+        f"configs: {[c.name for c in configs]}"
+    )
 
     print("Loading models (BGE-M3, BM25" + (", reranker" if _needs_rerank(configs) else "") + ")")
     dense, sparse = await asyncio.to_thread(create_embedders)
@@ -470,9 +504,9 @@ async def main(argv: list[str] | None = None) -> None:
             llm = ClaudeLLM()
             for config in configs:
                 print(f"Answering and judging {config.name}")
-                checkpoint = RESULTS_DIR / f"{config.name}_{args.split}{CHECKPOINT_SUFFIX}"
+                checkpoint = RESULTS_DIR / f"{config.name}_{args.split}{tag}{CHECKPOINT_SUFFIX}"
                 answers = await evaluate_full(config, questions, retrievers, llm, checkpoint)
-                answer_summary = write_full_report(config, args.split, answers, stamp)
+                answer_summary = write_full_report(config, args.split, answers, stamp, tag)
                 # The report now holds everything; a new run starts fresh.
                 checkpoint.unlink()
                 print(f"  -> {answer_summary['overall']}")
@@ -482,14 +516,14 @@ async def main(argv: list[str] | None = None) -> None:
         for config in configs:
             print(f"Evaluating {config.name}")
             results = await evaluate_retrieval(config, questions, retrievers)
-            summary = write_config_report(config, args.split, results, stamp)
+            summary = write_config_report(config, args.split, results, stamp, tag)
             rows.append((config.name, config.description, summary))
             overall = summary["overall"]
             print(f"  -> {overall}")
 
         if len(rows) > 1:
             k = configs[0].metrics.k
-            path = RESULTS_DIR / f"{stamp}_retrieval_comparison.md"
+            path = RESULTS_DIR / f"{stamp}{tag}_retrieval_comparison.md"
             path.write_text(comparison_markdown(args.split, k, rows), encoding="utf-8")
             print(path.read_text(encoding="utf-8"))
     finally:

@@ -269,6 +269,36 @@ class HistoryTurn(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
 
 
+# Named request examples. Swagger shows them as a dropdown on POST /ask
+# (`openapi_examples` in routes/ask.py); the schema lists the same values.
+ASK_EXAMPLES: dict[str, dict[str, Any]] = {
+    "english": {
+        "summary": "English question",
+        "value": {"question": "How long can the Commissioner extend the integration date?"},
+    },
+    "urdu": {
+        "summary": "Urdu question (answered in Urdu)",
+        "value": {"question": "کمشنر انٹیگریشن کی تاریخ کتنی بڑھا سکتا ہے؟"},
+    },
+    "follow_up": {
+        "summary": "Follow-up with history",
+        "value": {
+            "question": "And what happens if I miss it?",
+            "history": [
+                {
+                    "role": "user",
+                    "content": "How long can the Commissioner extend the integration date?",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Up to 60 days in total, in 15-day steps [1].",
+                },
+            ],
+        },
+    },
+}
+
+
 class AskRequest(BaseModel):
     """Body of POST /ask.
 
@@ -282,24 +312,7 @@ class AskRequest(BaseModel):
     history: list[HistoryTurn] = Field(default_factory=list, max_length=6)
 
     model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"question": "How long can the Commissioner extend the integration date?"},
-                {
-                    "question": "And what happens if I miss it?",
-                    "history": [
-                        {
-                            "role": "user",
-                            "content": "How long can the Commissioner extend the integration date?",
-                        },
-                        {
-                            "role": "assistant",
-                            "content": "Up to 60 days in total, in 15-day steps [1].",
-                        },
-                    ],
-                },
-            ]
-        }
+        json_schema_extra={"examples": [example["value"] for example in ASK_EXAMPLES.values()]}
     )
 
 
@@ -435,6 +448,37 @@ class AskResponse(BaseModel):
                         "rerank": 14250.0,
                         "generation": 3900.2,
                         "total": 18971.1,
+                    },
+                },
+                {
+                    "request_id": "1b2c3d4e5f6a4b7c8d9e0f1a2b3c4d5e",
+                    "answer": (
+                        "کمشنر ان لینڈ ریونیو انٹیگریشن کی تاریخ مجموعی طور پر 60 دن تک، "
+                        "15 دن کے وقفوں سے بڑھا سکتا ہے [1]۔\n\n"
+                        "یہ قانونی مشورہ نہیں ہے؛ حوالہ دیا گیا قاعدہ خود دیکھ لیں۔"
+                    ),
+                    "answerable": True,
+                    "language": "ur",
+                    "citations": [
+                        {
+                            "n": 1,
+                            "chunk_id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+                            "doc_id": "5d1f8a2b-3c4e-4f60-8a9b-0c1d2e3f4a5b",
+                            "filename": "sales_tax_rules_2006_upto_2026-07-31.pdf",
+                            "page_start": 108,
+                            "page_end": 108,
+                            "section_path": ["Chapter XIV-H", "150V. Extension of time"],
+                        }
+                    ],
+                    "general_context": None,
+                    "chunk_count": 6,
+                    "retrieved_chunks": [],
+                    "timings_ms": {
+                        "guardrails": 0.5,
+                        "retrieval": 850.0,
+                        "rerank": 14100.0,
+                        "generation": 5200.0,
+                        "total": 20150.5,
                     },
                 },
                 {

@@ -56,7 +56,7 @@ async def test_answer_has_citations_built_from_metadata(
     body = response.json()
     assert body["answerable"] is True
     assert body["answer"].startswith("Up to thirty days [1].")
-    assert body["answer"].endswith(settings.legal_disclaimer)
+    assert body["answer"].endswith(settings.legal_disclaimers["en"])
     [citation] = body["citations"]
     assert citation["n"] == 1
     assert citation["filename"] == "rules.txt"
@@ -85,7 +85,7 @@ async def test_answer_without_valid_citation_is_regenerated_then_refused(
     fake_llm.replies.extend([reply("Thirty days [7].", [7]), reply("Thirty days.", [])])
     body = (await ask(db_client, auth_headers)).json()
     assert body["answerable"] is False
-    assert body["answer"] == settings.refusal_message
+    assert body["answer"] == settings.refusal_messages["en"]
     assert body["citations"] == []
     assert len(fake_llm.calls) == 2
 
@@ -97,7 +97,7 @@ async def test_model_not_answerable_gives_the_exact_refusal(
     fake_llm.replies.append(reply("n/a", [], answerable=False))
     body = (await ask(db_client, auth_headers, "What is the income tax rate on salary?")).json()
     assert body["answerable"] is False
-    assert body["answer"] == settings.refusal_message
+    assert body["answer"] == settings.refusal_messages["en"]
 
 
 @pytest.mark.usefixtures("with_document")
@@ -107,7 +107,7 @@ async def test_weak_retrieval_refuses_without_calling_the_llm(
     # No word overlaps the document, so the fake reranker scores 0.
     body = (await ask(db_client, auth_headers, "Zebra quantum banana?")).json()
     assert body["answerable"] is False
-    assert body["answer"] == settings.refusal_message
+    assert body["answer"] == settings.refusal_messages["en"]
     assert fake_llm.calls == []
     assert body["timings_ms"]["generation"] < 50
 
@@ -117,7 +117,7 @@ async def test_user_without_documents_gets_the_empty_index_message(
 ) -> None:
     body = (await ask(db_client, auth_headers)).json()
     assert body["answerable"] is False
-    assert body["answer"] == settings.empty_index_message
+    assert body["answer"] == settings.empty_index_messages["en"]
     assert body["retrieved_chunks"] == []
     assert fake_llm.calls == []
 
@@ -137,7 +137,7 @@ async def test_leaking_answer_is_replaced_with_a_refusal(
     fake_llm.replies.append(reply(leak.format(canary=settings.prompt_canary), [1]))
     body = (await ask(db_client, auth_headers)).json()
     assert body["answerable"] is False
-    assert body["answer"] == settings.refusal_message
+    assert body["answer"] == settings.refusal_messages["en"]
     assert body["citations"] == []
 
 
@@ -200,3 +200,57 @@ async def test_invalid_questions_return_422(
     response = await db_client.post("/ask", headers=auth_headers, json=body)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
+
+
+# --- Urdu (bonus B2) ---------------------------------------------------------------
+
+# Shares English words with RULE_TEXT, because the fake reranker scores by
+# word overlap. The real BGE-M3 needs no shared words: the Urdu golden-set
+# questions measure that (evals/results/*_ur*).
+URDU_QUESTION = "Commissioner integration date extend کمشنر کتنے دن تک توسیع کر سکتا ہے؟"
+
+
+@pytest.mark.usefixtures("with_document")
+async def test_urdu_question_gets_an_urdu_answer_and_disclaimer(
+    db_client: httpx.AsyncClient, auth_headers: dict[str, str], fake_llm: FakeLLM
+) -> None:
+    fake_llm.replies.append(reply("کمشنر تیس دن تک توسیع کر سکتا ہے [1]۔", [1]))
+    response = await ask(db_client, auth_headers, URDU_QUESTION)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["language"] == "ur"
+    assert body["answer"].startswith("کمشنر تیس دن")
+    assert body["answer"].endswith(settings.legal_disclaimers["ur"])
+    assert [c["filename"] for c in body["citations"]] == ["rules.txt"]
+    # The model was told to answer in the question's language, and got the Urdu question.
+    call = fake_llm.calls[0]
+    assert "Answer in the language of the question" in call.system
+    assert "کمشنر" in call.prompt
+
+
+@pytest.mark.usefixtures("with_document")
+async def test_urdu_question_the_model_cannot_answer_is_refused_in_urdu(
+    db_client: httpx.AsyncClient, auth_headers: dict[str, str], fake_llm: FakeLLM
+) -> None:
+    fake_llm.replies.append(reply("n/a", [], answerable=False))
+    body = (await ask(db_client, auth_headers, URDU_QUESTION)).json()
+    assert body["answerable"] is False
+    assert body["answer"] == settings.refusal_messages["ur"]
+    assert body["language"] == "ur"
+
+
+@pytest.mark.usefixtures("with_document")
+async def test_weak_retrieval_refuses_in_urdu_without_calling_the_llm(
+    db_client: httpx.AsyncClient, auth_headers: dict[str, str], fake_llm: FakeLLM
+) -> None:
+    body = (await ask(db_client, auth_headers, "زکوٰۃ کا نصاب کتنا ہے؟")).json()
+    assert body["answer"] == settings.refusal_messages["ur"]
+    assert fake_llm.calls == []
+
+
+async def test_urdu_user_without_documents_gets_the_urdu_empty_index_message(
+    db_client: httpx.AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    body = (await ask(db_client, auth_headers, URDU_QUESTION)).json()
+    assert body["answer"] == settings.empty_index_messages["ur"]
+    assert body["language"] == "ur"

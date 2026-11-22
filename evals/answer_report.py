@@ -4,12 +4,12 @@ Kept apart from `evals/report.py` (retrieval only) so each file stays small.
 Everything here is pure: the same results always give the same report.
 """
 
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 from evals.metrics import mean_ignoring_none
-from evals.report import QuestionResult, RetrievedRow, _fmt
+from evals.report import QuestionResult, RetrievedRow, _fmt, grouped_averages, translation_pairs
 
 # Thresholds tried for REFUSAL_THRESHOLD on the real answer outcomes.
 FULL_SWEEP = [0.0, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
@@ -35,6 +35,8 @@ class AnswerResult:
         unsupported_claims: Claims not supported by the retrieved chunks.
         generation_ms: Time in the answering model.
         total_ms: Time for the whole pipeline.
+        language_match: The answer is written in the question's language,
+            checked from its script (None if refused: refusals are fixed texts).
     """
 
     retrieval: QuestionResult
@@ -52,6 +54,7 @@ class AnswerResult:
     unsupported_claims: list[str] = field(default_factory=list)
     generation_ms: float = 0.0
     total_ms: float = 0.0
+    language_match: bool | None = None
 
 
 def answer_result_from_dict(data: dict[str, object]) -> AnswerResult:
@@ -70,21 +73,24 @@ def answer_result_from_dict(data: dict[str, object]) -> AnswerResult:
 
 
 def summarise_answers(results: Sequence[AnswerResult]) -> dict[str, object]:
-    """Average the answer metrics overall and per category.
+    """Average the answer metrics overall, per category and per language.
 
     Args:
         results: One result per question.
 
     Returns:
-        ``overall`` and ``per_category`` dicts.
+        ``overall``, ``per_category`` and ``per_language`` dicts, plus ``paired``
+        (English vs Urdu on the translated questions only).
     """
-    by_category: dict[str, list[AnswerResult]] = defaultdict(list)
-    for result in results:
-        by_category[result.retrieval.category].append(result)
+    originals, translations = translation_pairs(results, lambda r: r.retrieval)
     return {
         "overall": _answer_averages(results),
-        "per_category": {
-            name: _answer_averages(group) for name, group in sorted(by_category.items())
+        "per_category": grouped_averages(results, lambda r: r.retrieval.category, _answer_averages),
+        "per_language": grouped_averages(results, lambda r: r.retrieval.language, _answer_averages),
+        "paired": {
+            "pairs": len(translations),
+            "original": _answer_averages(originals),
+            "translation": _answer_averages(translations),
         },
     }
 
@@ -113,6 +119,9 @@ def _answer_averages(results: Sequence[AnswerResult]) -> dict[str, object]:
         ),
         "false_refusal_rate": _share(r.refused for r in answerable),
         "unanswerable_refused_rate": _share(r.refused for r in unanswerable),
+        "language_match_rate": _share(
+            r.language_match for r in answered if r.language_match is not None
+        ),
     }
 
 
@@ -191,17 +200,18 @@ def answers_markdown(
         f"| citation support (answered) | {_fmt(overall['citation_support'])} |",
         f"| unanswerable correctly refused | {_pct(overall['unanswerable_refused_rate'])} |",
         f"| false refusals (answerable refused) | {_pct(overall['false_refusal_rate'])} |",
-        "",
-        "## Per category",
-        "",
-        "| Category | n | faithfulness | correctness | correct | partly | wrong |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        f"| answered in the question's language | {_pct(overall['language_match_rate'])} |",
     ]
-    for category, values in per_category.items():
-        lines.append(
-            f"| {category} | {values['questions']} | {_fmt(values['faithfulness'])} | "
-            f"{_fmt(values['correctness'])} | {values['correct']} | {values['partly']} | "
-            f"{values['wrong']} |"
+    lines += _answer_table("Per category", "Category", per_category)
+    per_language = summary["per_language"]
+    paired = summary["paired"]
+    assert isinstance(per_language, dict) and isinstance(paired, dict)
+    lines += _answer_table("Per language", "Language", per_language)
+    if paired["pairs"]:
+        lines += _answer_table(
+            f"English vs Urdu (the {paired['pairs']} translated questions)",
+            "Asked in",
+            {"English original": paired["original"], "Urdu translation": paired["translation"]},
         )
     lines += [
         "",
@@ -229,6 +239,33 @@ def answers_markdown(
             f"  reason: {result.verdict_reason}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _answer_table(title: str, label: str, groups: dict[str, dict[str, object]]) -> list[str]:
+    """Render one Markdown table of answer metrics, one row per group.
+
+    Args:
+        title: Section heading.
+        label: Header of the first column.
+        groups: Group name -> metrics from `_answer_averages`.
+
+    Returns:
+        The section's lines, starting with a blank line.
+    """
+    lines = [
+        "",
+        f"## {title}",
+        "",
+        f"| {label} | n | faithfulness | correctness | correct | partly | wrong | in language |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for name, values in groups.items():
+        lines.append(
+            f"| {name} | {values['questions']} | {_fmt(values['faithfulness'])} | "
+            f"{_fmt(values['correctness'])} | {values['correct']} | {values['partly']} | "
+            f"{values['wrong']} | {_pct(values['language_match_rate'])} |"
+        )
+    return lines
 
 
 def _score(result: AnswerResult) -> float:

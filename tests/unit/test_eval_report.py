@@ -139,3 +139,32 @@ def test_cached_blocks_round_trip_through_json() -> None:
     )
     restored = _block_from_json(json.loads(json.dumps(asdict(block))))
     assert restored == block
+
+
+def test_summarise_reports_per_language_and_translation_pairs() -> None:
+    english = make_result(hit=1.0)
+    english.id = "q001"
+    urdu = make_result(hit=0.0)
+    urdu.id, urdu.language, urdu.translation_of = "q051", "ur", "q001"
+    unpaired_urdu = make_result(answerable=False)
+    unpaired_urdu.id, unpaired_urdu.language = "q050", "ur"
+    summary = summarise([english, urdu, unpaired_urdu])
+    per_language = summary["per_language"]
+    paired = summary["paired"]
+    assert isinstance(per_language, dict) and isinstance(paired, dict)
+    assert per_language["en"]["questions"] == 1 and per_language["ur"]["questions"] == 2
+    # Only complete pairs count: q050 has no English original.
+    assert paired["pairs"] == 1
+    assert paired["original"]["hit_rate"] == 1.0 and paired["translation"]["hit_rate"] == 0.0
+    markdown = config_markdown("final", "d", "all", "c", 6, summary, [], [english, urdu])
+    assert "## Per language" in markdown
+    assert "| Urdu translation | 1 | 0.000 |" in markdown
+
+
+def test_translation_without_its_original_in_the_run_makes_no_pair() -> None:
+    urdu = make_result()
+    urdu.language, urdu.translation_of = "ur", "q001"
+    summary = summarise([urdu])
+    paired = summary["paired"]
+    assert isinstance(paired, dict) and paired["pairs"] == 0
+    assert "English vs Urdu" not in config_markdown("f", "d", "all", "c", 6, summary, [], [urdu])

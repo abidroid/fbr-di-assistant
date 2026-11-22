@@ -10,6 +10,7 @@ from evals.answer_report import (
     AnswerResult,
     answer_result_from_dict,
     answer_threshold_sweep,
+    answers_markdown,
     summarise_answers,
 )
 from evals.judge import (
@@ -43,7 +44,7 @@ def test_factual_f1(tp: int, fp: int, fn: int, expected: float) -> None:
 
 
 def test_disclaimer_is_not_graded() -> None:
-    assert strip_for_grading(f"Thirty days [1].\n\n{settings.legal_disclaimer}") == (
+    assert strip_for_grading(f"Thirty days [1].\n\n{settings.legal_disclaimers['en']}") == (
         "Thirty days [1]."
     )
 
@@ -178,3 +179,25 @@ def test_checkpoint_round_trip_restores_the_nested_result() -> None:
         RetrievedRow(1, "f.pdf", 3, 3, "Rules > 150V", 0.7, 0.9, 0.95, False, True)
     ]
     assert answer_result_from_dict(asdict(original)) == original
+
+
+def test_urdu_disclaimer_is_not_graded_either() -> None:
+    urdu = f"ساٹھ دن [1]۔\n\n{settings.legal_disclaimers['ur']}"
+    assert strip_for_grading(urdu) == "ساٹھ دن [1]۔"
+
+
+def test_answer_summary_has_language_tables_and_pairs() -> None:
+    english = make_result("q1", True, False, 0.9, "correct")
+    urdu = make_result("q51", True, False, 0.9, "partly")
+    urdu.retrieval.language, urdu.retrieval.translation_of = "ur", "q1"
+    english.language_match, urdu.language_match = True, False
+    summary = summarise_answers([english, urdu])
+    per_language = summary["per_language"]
+    paired = summary["paired"]
+    assert isinstance(per_language, dict) and isinstance(paired, dict)
+    assert per_language["ur"]["partly"] == 1 and per_language["en"]["correct"] == 1
+    assert per_language["ur"]["language_match_rate"] == 0.0
+    assert paired["pairs"] == 1
+    assert paired["original"]["correct"] == 1 and paired["translation"]["partly"] == 1
+    markdown = answers_markdown("final", "all", "judge", summary, [], [english, urdu], 0.05)
+    assert "## Per language" in markdown and "English vs Urdu (the 1 translated" in markdown

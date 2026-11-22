@@ -6,7 +6,7 @@ same results always produce the same report.
 
 import statistics
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from evals.golden_set import GoldenQuestion
@@ -68,6 +68,8 @@ class QuestionResult:
         best_rerank_score: Best raw rerank score, if reranking ran.
         below_threshold: Retrieval would refuse with the current threshold.
         latency_ms: Total retrieval time.
+        language: The question's language (``en`` or ``ur``).
+        translation_of: Id of the English original, for translated questions.
         retrieved: The final chunks.
     """
 
@@ -82,6 +84,9 @@ class QuestionResult:
     best_rerank_score: float | None
     below_threshold: bool
     latency_ms: float
+    # Defaults keep result files from before Phase 10 loadable.
+    language: str = "en"
+    translation_of: str | None = None
     retrieved: list[RetrievedRow] = field(default_factory=list)
 
 
@@ -112,24 +117,76 @@ def score_question(
 
 
 def summarise(results: Sequence[QuestionResult]) -> dict[str, object]:
-    """Average the metrics overall and per category.
+    """Average the metrics overall, per category and per language.
 
     Args:
         results: One result per question.
 
     Returns:
-        ``overall`` and ``per_category`` dicts with hit_rate, recall, mrr and
-        question counts, plus retrieval latency p50/p95 in milliseconds.
+        ``overall``, ``per_category`` and ``per_language`` dicts with hit_rate,
+        recall, mrr and question counts; ``paired`` (English vs Urdu on the
+        translated questions only); retrieval latency p50/p95 in milliseconds.
     """
-    by_category: dict[str, list[QuestionResult]] = defaultdict(list)
-    for result in results:
-        by_category[result.category].append(result)
     latencies = sorted(result.latency_ms for result in results)
+    originals, translations = translation_pairs(results, lambda r: r)
     return {
         "overall": _averages(results),
-        "per_category": {name: _averages(group) for name, group in sorted(by_category.items())},
+        "per_category": grouped_averages(results, lambda r: r.category, _averages),
+        "per_language": grouped_averages(results, lambda r: r.language, _averages),
+        "paired": {
+            "pairs": len(translations),
+            "original": _averages(originals),
+            "translation": _averages(translations),
+        },
         "latency_ms": {"p50": _percentile(latencies, 50), "p95": _percentile(latencies, 95)},
     }
+
+
+def grouped_averages[T](
+    results: Sequence[T],
+    key: Callable[[T], str],
+    average: Callable[[Sequence[T]], dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Average each group of results, groups sorted by name.
+
+    Args:
+        results: The results to group.
+        key: Gives each result's group name (category, language, ...).
+        average: Turns one group into its metrics.
+
+    Returns:
+        Group name -> metrics.
+    """
+    groups: dict[str, list[T]] = defaultdict(list)
+    for result in results:
+        groups[key(result)].append(result)
+    return {name: average(group) for name, group in sorted(groups.items())}
+
+
+def translation_pairs[T](
+    results: Sequence[T], question: Callable[[T], QuestionResult]
+) -> tuple[list[T], list[T]]:
+    """Match each translated question with its original, when both were run.
+
+    Comparing only complete pairs means both languages are averaged over the
+    same questions, so a difference comes from the language, not the mix.
+
+    Args:
+        results: Retrieval or answer results.
+        question: Gives a result's `QuestionResult` (itself, or ``.retrieval``).
+
+    Returns:
+        (originals, translations), position i of each forming one pair.
+    """
+    by_id = {question(result).id: result for result in results}
+    originals: list[T] = []
+    translations: list[T] = []
+    for result in results:
+        original = by_id.get(question(result).translation_of or "")
+        if original is not None:
+            originals.append(original)
+            translations.append(result)
+    return originals, translations
 
 
 def threshold_sweep(results: Sequence[QuestionResult]) -> list[dict[str, float]]:
@@ -206,16 +263,19 @@ def config_markdown(
         f"\n| recall@{k} | {_fmt(overall['recall'])} |\n| MRR | {_fmt(overall['mrr'])} |"
         f"\n| answerable questions | {overall['answerable']} |"
         f"\n| latency p50 / p95 (ms) | {latency['p50']:.0f} / {latency['p95']:.0f} |",
-        "",
-        "## Per category",
-        "",
-        f"| Category | n | hit@{k} | recall@{k} | MRR |",
-        "| --- | --- | --- | --- | --- |",
     ]
-    for category, values in per_category.items():
-        lines.append(
-            f"| {category} | {values['questions']} | {_fmt(values['hit_rate'])} | "
-            f"{_fmt(values['recall'])} | {_fmt(values['mrr'])} |"
+    lines += _metric_table("Per category", "Category", per_category, k)
+    per_language = summary["per_language"]
+    paired = summary["paired"]
+    assert isinstance(per_language, dict) and isinstance(paired, dict)
+    lines += _metric_table("Per language", "Language", per_language, k)
+    if paired["pairs"]:
+        # The same questions in both languages: the fair English-vs-Urdu comparison.
+        lines += _metric_table(
+            f"English vs Urdu (the {paired['pairs']} translated questions)",
+            "Asked in",
+            {"English original": paired["original"], "Urdu translation": paired["translation"]},
+            k,
         )
     if sweep:
         lines += [
@@ -242,6 +302,35 @@ def config_markdown(
             f"  expected {', '.join(miss.expected)}; top-1 was {got}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _metric_table(
+    title: str, label: str, groups: dict[str, dict[str, object]], k: int
+) -> list[str]:
+    """Render one Markdown table of hit/recall/MRR, one row per group.
+
+    Args:
+        title: Section heading.
+        label: Header of the first column.
+        groups: Group name -> metrics from `_averages`.
+        k: Metric cut-off.
+
+    Returns:
+        The section's lines, starting with a blank line.
+    """
+    lines = [
+        "",
+        f"## {title}",
+        "",
+        f"| {label} | n | hit@{k} | recall@{k} | MRR |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for name, values in groups.items():
+        lines.append(
+            f"| {name} | {values['questions']} | {_fmt(values['hit_rate'])} | "
+            f"{_fmt(values['recall'])} | {_fmt(values['mrr'])} |"
+        )
+    return lines
 
 
 def comparison_markdown(

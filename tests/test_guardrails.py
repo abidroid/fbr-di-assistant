@@ -94,7 +94,7 @@ async def test_off_topic_is_a_polite_200_refusal(
     response = await ask(db_client, auth_headers, "Write me a poem about cricket.")
     assert response.status_code == 200
     body = response.json()
-    assert body["answer"] == settings.off_topic_message
+    assert body["answer"] == settings.off_topic_messages["en"]
     assert body["answerable"] is False and body["citations"] == []
     assert fake_llm.calls == []  # no retrieval, no answer model
 
@@ -148,7 +148,7 @@ async def test_question_after_deleting_the_document_uses_no_deleted_chunks(
     deleted = await db_client.delete(f"/documents/{doc['id']}", headers=auth_headers)
     assert deleted.status_code == 204
     # Used only if retrieval is not under the threshold.
-    fake_llm.replies.append(reply(settings.refusal_message, [], answerable=False))
+    fake_llm.replies.append(reply(settings.refusal_messages["en"], [], answerable=False))
     response = await ask(db_client, auth_headers)
     assert response.status_code == 200
     assert all(c["filename"] != "rules.txt" for c in response.json()["retrieved_chunks"])
@@ -160,7 +160,7 @@ async def test_question_after_deleting_the_only_document_gets_the_upload_message
     doc = await upload_text(db_client, auth_headers, RULE_TEXT, "rules.txt")
     await db_client.delete(f"/documents/{doc['id']}", headers=auth_headers)
     response = await ask(db_client, auth_headers)
-    assert response.json()["answer"] == settings.empty_index_message
+    assert response.json()["answer"] == settings.empty_index_messages["en"]
 
 
 async def test_contradicting_documents_are_both_cited_with_their_dates(
@@ -349,3 +349,12 @@ async def test_concurrent_identical_uploads_give_one_201_and_one_409(
     assert sorted([first.status_code, second.status_code]) == [201, 409]
     listed = await db_client.get("/documents", headers=auth_headers)
     assert len(listed.json()) == 1
+
+
+async def test_urdu_off_topic_question_gets_the_urdu_refusal(
+    db_client: httpx.AsyncClient, auth_headers: dict[str, str], classifier: FakeClassifier
+) -> None:
+    classifier.label = "off_topic"
+    body = (await ask(db_client, auth_headers, "کرکٹ پر ایک نظم لکھیں۔")).json()
+    assert body["answer"] == settings.off_topic_messages["ur"]
+    assert body["language"] == "ur"
