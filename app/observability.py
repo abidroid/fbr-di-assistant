@@ -31,7 +31,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from langfuse import Langfuse, propagate_attributes
+from langfuse import Langfuse, is_langfuse_span, propagate_attributes
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
@@ -420,6 +420,10 @@ def setup_tracing(redact: Callable[[str], str] | None = None) -> NoopTracer:
         base_url=settings.langfuse_host,
         environment=settings.langfuse_environment,
         mask=(lambda *, data, **_: mask_strings(data, redact)) if redact else None,
+        # Export only spans our code opened. The Anthropic SDK emits its own
+        # OpenTelemetry span per call; exported too, it would count every
+        # call's tokens and cost twice, and it bypasses our redaction.
+        should_export_span=is_langfuse_span,
     )
     set_tracer(LangfuseTracer(client))
     tracing_logger.info("Langfuse tracing on (environment=%s)", settings.langfuse_environment)

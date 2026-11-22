@@ -94,6 +94,7 @@ def test_api_row_is_converted_with_cached_tokens_counted_as_input() -> None:
         trace_id="t",
         name="llm.ModelAnswer",
         parent_observation_id="p",
+        is_root_observation=False,
         start_time=T0,
         end_time=T0 + timedelta(milliseconds=1500),
         level=SimpleNamespace(value="DEFAULT"),
@@ -108,3 +109,25 @@ def test_api_row_is_converted_with_cached_tokens_counted_as_input() -> None:
     assert result.input_tokens == 150
     assert result.cost == pytest.approx(0.0012)
     assert result.is_root is False
+
+
+def test_root_is_detected_even_with_a_remote_parent_id() -> None:
+    # Setting the trace id ourselves gives the root a (hidden) remote parent.
+    row = SimpleNamespace(
+        trace_id="t",
+        name="ask",
+        parent_observation_id="remote-parent",
+        is_root_observation=True,
+        start_time=T0,
+        end_time=None,
+        level=None,
+        model=None,
+        usage_details=None,
+        total_cost=None,
+        cost_details=None,
+        tags=["api"],
+    )
+    result = to_observation(row)
+    assert result.is_root is True
+    assert result.latency_ms is None
+    assert result.level == "DEFAULT"

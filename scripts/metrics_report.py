@@ -32,6 +32,7 @@ RESULTS_DIR = Path("evals/results")
 # Field groups to request: ids/times (core), name/level (basic), tokens and
 # cost (usage), model id (model) and tags (trace_context).
 FIELDS = "core,basic,usage,model,trace_context"
+SDK_SPAN_PREFIX = "anthropic."
 
 
 @dataclass(frozen=True)
@@ -309,7 +310,9 @@ def to_observation(row: Any) -> Observation:
     return Observation(
         trace_id=row.trace_id,
         name=row.name or "?",
-        is_root=row.parent_observation_id is None,
+        # Langfuse's own flag: our root has a parent id (the remote parent
+        # created when we set the trace id ourselves), so "no parent" misses it.
+        is_root=bool(row.is_root_observation),
         start=row.start_time,
         latency_ms=latency,
         level=str(getattr(row.level, "value", row.level) or "DEFAULT"),
@@ -359,6 +362,10 @@ def fetch_observations(days: int, max_items: int) -> list[Observation]:
     )
     for page in pages:
         for row in page.data:
+            # Traces recorded before the export filter also hold the Anthropic
+            # SDK's own span per call, which would count every call twice.
+            if (row.name or "").startswith(SDK_SPAN_PREFIX):
+                continue
             # The API may return a row twice across pages; keep one.
             seen[row.id] = to_observation(row)
     return list(seen.values())
