@@ -1,7 +1,10 @@
 /** The main page: a header with the user, then documents and chat. */
 import { FileSearch, LogOut } from "lucide-react"
 
+import { DocumentTable } from "@/components/documents/DocumentTable"
+import { UploadDropzone } from "@/components/documents/UploadDropzone"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/context/AuthContext"
 
 /** Header bar shared by the documents and chat sections. */
@@ -26,13 +29,35 @@ function Header() {
   )
 }
 
-/** The page a logged-in user sees. */
+/** Upload area plus the list of the user's documents. */
+function DocumentsSection() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Documents</CardTitle>
+        <CardDescription>Only you can see and search the files you upload.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <UploadDropzone />
+        <DocumentTable />
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The page a logged-in user sees: documents on the left, chat on the right. */
 export function HomePage() {
   return (
     <div className="min-h-svh bg-muted/40">
       <Header />
-      <main className="mx-auto max-w-7xl p-4">
-        <p className="text-muted-foreground">Documents and chat come next.</p>
+      {/* Stacked on small screens; side by side from the lg breakpoint. */}
+      <main className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <DocumentsSection />
+        </div>
+        <div className="lg:col-span-3">
+          <p className="text-muted-foreground">Chat comes next.</p>
+        </div>
       </main>
     </div>
   )
