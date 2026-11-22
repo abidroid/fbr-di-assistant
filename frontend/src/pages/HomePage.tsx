@@ -1,6 +1,7 @@
 /** The main page: a header with the user, then documents and chat. */
 import { FileSearch, LogOut } from "lucide-react"
 
+import { ChatPanel } from "@/components/chat/ChatPanel"
 import { DocumentTable } from "@/components/documents/DocumentTable"
 import { UploadDropzone } from "@/components/documents/UploadDropzone"
 import { Button } from "@/components/ui/button"
@@ -56,7 +57,7 @@ export function HomePage() {
           <DocumentsSection />
         </div>
         <div className="lg:col-span-3">
-          <p className="text-muted-foreground">Chat comes next.</p>
+          <ChatPanel />
         </div>
       </main>
     </div>
