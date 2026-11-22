@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str = "https://cloud.langfuse.com"
+    # Separates local experiments from the deployed app in the Langfuse UI.
+    langfuse_environment: str = "dev"
 
     # --- Auth ---------------------------------------------------------------
     jwt_algorithm: str = "HS256"
@@ -203,6 +205,16 @@ class Settings(BaseSettings):
     )
     # The verdict JSON is a few tokens; a small cap keeps the call cheap.
     classifier_max_tokens: int = 64
+    # USD per million tokens (Anthropic list prices, Nov 2026). Our code turns
+    # token counts into cost with this table instead of relying on Langfuse's
+    # built-in prices, which may not know models this new. Cache reads cost
+    # ~10% of input and cache writes 125%; we send no cache_control today, so
+    # those rows only matter if prompt caching is switched on later.
+    model_prices: dict[str, dict[str, float]] = {
+        "claude-sonnet-5-5": {"input": 2.0, "output": 10.0, "cache_read": 0.10, "cache_write": 2.5},
+        "claude-haiku-5-5": {"input": 0.1, "output": 0.5, "cache_read": 0.01, "cache_write": 0.125},
+        "claude-opus-5-5": {"input": 4.0, "output": 20.0, "cache_read": 0.20, "cache_write": 5.0},
+    }
     # Random marker in the system prompt; if it ever appears in an answer, the
     # prompt leaked. A fresh value per process is fine because it is never stored.
     prompt_canary: str = Field(default_factory=lambda: f"CANARY-{secrets.token_hex(8)}")

@@ -24,13 +24,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError, UpstreamUnavailableError
-from app.generation import ClaudeLLM
-from app.guardrails import LLMClassifier, limiter
+from app.generation import ClaudeLLM, leak_markers
+from app.guardrails import LLMClassifier, limiter, redact
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
 from app.ingestion.store import ensure_collection
-from app.observability import REQUEST_ID_HEADER, RequestIdMiddleware, setup_logging
+from app.observability import (
+    REQUEST_ID_HEADER,
+    RequestIdMiddleware,
+    setup_logging,
+    setup_tracing,
+    shutdown_tracing,
+)
 from app.retrieval import create_reranker
 from app.routes import ask, auth, documents, health
 from app.schemas import ErrorDetail, ErrorResponse
@@ -73,10 +79,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Qdrant may still be starting; /health reports it, and the first
         # upload creates the collection anyway.
         logger.warning("Could not prepare the Qdrant collection at startup", exc_info=True)
+    # Langfuse if its keys are in .env, otherwise a no-op (tests never get here).
+    setup_tracing(redact=lambda text: redact(text, leak_markers()))
     logger.info("Startup complete")
     try:
         yield
     finally:
+        # Spans are sent in background batches; flush so the last ones are not lost.
+        shutdown_tracing()
         await app.state.qdrant.close()
         # Close pooled Neon connections cleanly instead of letting them be dropped.
         await engine.dispose()

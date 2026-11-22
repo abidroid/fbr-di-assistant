@@ -16,7 +16,7 @@ os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/unused"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["ANTHROPIC_API_KEY"] = "test-key-not-real"
 
-from collections.abc import AsyncIterator  # noqa: E402
+from collections.abc import AsyncIterator, Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
@@ -47,6 +47,7 @@ from app.ingestion.caption import FakeCaptioner  # noqa: E402
 from app.ingestion.embed import FakeEmbedder, FakeSparseEmbedder  # noqa: E402
 from app.ingestion.extract import Extractor  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.observability import NoopTracer, RecordingTracer, set_tracer  # noqa: E402
 from app.retrieval import FakeReranker  # noqa: E402
 
 TEST_PASSWORD = "a-long-secret-phrase"
@@ -167,6 +168,26 @@ def fake_llm() -> FakeLLM:
 def classifier() -> FakeClassifier:
     """Input classifier that says "ok"; a test sets ``.label`` to change it."""
     return FakeClassifier()
+
+
+@pytest.fixture(autouse=True)
+def no_tracing() -> Iterator[None]:
+    """Run every test with tracing off, whatever Langfuse keys .env holds.
+
+    The test app never runs its lifespan (so `setup_tracing` is not called),
+    but forcing the no-op here keeps that true if a test ever does.
+    """
+    previous = set_tracer(NoopTracer())
+    yield
+    set_tracer(previous)
+
+
+@pytest.fixture
+def tracer() -> RecordingTracer:
+    """Record spans in memory for this test (replaces the no-op tracer)."""
+    recording = RecordingTracer()
+    set_tracer(recording)  # `no_tracing` restores the original afterwards
+    return recording
 
 
 @pytest.fixture(autouse=True)
