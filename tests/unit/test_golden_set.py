@@ -11,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from evals.golden_set import GOLDEN_SET_PATH, Category, GoldenQuestion, load_golden_set
+from evals.golden_set import (
+    GOLDEN_SET_PATH,
+    Category,
+    GoldenQuestion,
+    check_translations,
+    load_golden_set,
+)
 
 CORPUS_DIR = Path(__file__).resolve().parents[2] / "corpus"
 FAQ_DOC = "faqs.jsonl"
@@ -63,26 +69,63 @@ def page_counts() -> dict[str, int]:
     return counts
 
 
-def test_golden_set_has_50_questions(questions: list[GoldenQuestion]) -> None:
-    """The plan fixes the set at 50 questions."""
-    assert len(questions) == 50
+def originals(questions: list[GoldenQuestion]) -> list[GoldenQuestion]:
+    """Return the questions that are not translations (the planned 50)."""
+    return [q for q in questions if q.translation_of is None]
+
+
+def test_golden_set_has_50_original_questions(questions: list[GoldenQuestion]) -> None:
+    """The plan fixes the set at 50 questions, plus the Urdu translations."""
+    assert len(originals(questions)) == 50
 
 
 def test_split_is_30_tune_20_heldout(questions: list[GoldenQuestion]) -> None:
     """Tuning uses 30 questions; the other 20 are kept back for the final report."""
-    assert Counter(q.split for q in questions) == {"tune": 30, "heldout": 20}
+    assert Counter(q.split for q in originals(questions)) == {"tune": 30, "heldout": 20}
 
 
 def test_category_counts_and_split_match_plan(questions: list[GoldenQuestion]) -> None:
     """Every category has its planned size, divided between tune and heldout as planned."""
+    base = originals(questions)
     actual = {
         category: (
-            sum(1 for q in questions if q.category == category and q.split == "tune"),
-            sum(1 for q in questions if q.category == category and q.split == "heldout"),
+            sum(1 for q in base if q.category == category and q.split == "tune"),
+            sum(1 for q in base if q.category == category and q.split == "heldout"),
         )
         for category in Category
     }
     assert actual == EXPECTED_SPLIT
+
+
+def test_eight_urdu_translations_spread_over_categories(
+    questions: list[GoldenQuestion],
+) -> None:
+    """Phase 10 adds 8 Urdu translations of English questions, in 8 different categories."""
+    translations = [q for q in questions if q.translation_of is not None]
+    assert len(translations) == 8
+    assert all(q.language == "ur" for q in translations)
+    assert len({q.category for q in translations}) == 8
+    assert Counter(q.split for q in translations) == {"tune": 5, "heldout": 3}
+
+
+def test_translation_must_match_its_original() -> None:
+    """A translation with a different split would make the paired comparison unfair."""
+    english = GoldenQuestion(
+        id="q001",
+        question="What is error 0052?",
+        category=Category.EXACT_CODE,
+        answerable=True,
+        sources=[{"doc": "a.pdf", "pages": [1]}],
+        reference_answer="HS code mismatch.",
+        split="tune",
+    )
+    urdu = english.model_copy(
+        update={"id": "q051", "language": "ur", "translation_of": "q001", "split": "heldout"}
+    )
+    with pytest.raises(ValueError, match="must match q001"):
+        check_translations([english, urdu])
+    with pytest.raises(ValueError, match="must name an original"):
+        check_translations([urdu.model_copy(update={"translation_of": "q999"})])
 
 
 def test_at_least_8_unanswerable(questions: list[GoldenQuestion]) -> None:

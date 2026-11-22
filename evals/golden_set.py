@@ -60,7 +60,9 @@ class GoldenQuestion(BaseModel):
         question: Worded the way an ERP/POS developer would ask it.
         category: Question type, used to report results per category.
         answerable: False when the corpus does not contain the answer.
-        language: ``en`` now; ``ur`` for the Urdu questions in Phase 10.
+        language: ``en`` or ``ur``.
+        translation_of: Id of the English question this one translates, so the
+            report can compare the same question in both languages; None otherwise.
         sources: Where the answer lives; empty exactly when unanswerable.
         reference_answer: The correct answer in one or two sentences.
         split: ``tune`` (used while tuning) or ``heldout`` (reported only).
@@ -71,6 +73,7 @@ class GoldenQuestion(BaseModel):
     category: Category
     answerable: bool
     language: Literal["en", "ur"] = "en"
+    translation_of: str | None = Field(default=None, pattern=r"^q\d{3}$")
     sources: list[Source]
     reference_answer: str = Field(min_length=1)
     split: Literal["tune", "heldout"]
@@ -113,8 +116,8 @@ def load_golden_set(path: Path = GOLDEN_SET_PATH) -> list[GoldenQuestion]:
         The questions in file order.
 
     Raises:
-        ValueError: If a line is invalid (the message names the line number)
-            or two questions share an id.
+        ValueError: If a line is invalid (the message names the line number),
+            two questions share an id, or a translation does not match its original.
     """
     questions: list[GoldenQuestion] = []
     seen_ids: set[str] = set()
@@ -129,4 +132,37 @@ def load_golden_set(path: Path = GOLDEN_SET_PATH) -> list[GoldenQuestion]:
             raise ValueError(f"{path.name} line {line_number}: duplicate id {question.id}")
         seen_ids.add(question.id)
         questions.append(question)
+    check_translations(questions)
     return questions
+
+
+def check_translations(questions: list[GoldenQuestion]) -> None:
+    """Check every translation against its original.
+
+    A pair is a fair English-vs-Urdu comparison only if both halves are graded
+    the same way: same category, split, answerability and source labels.
+
+    Args:
+        questions: The loaded golden set.
+
+    Raises:
+        ValueError: If an original is missing, is itself a translation, is in
+            the same language, or differs in category, split, answerable or sources.
+    """
+    by_id = {question.id: question for question in questions}
+    for question in questions:
+        if question.translation_of is None:
+            continue
+        original = by_id.get(question.translation_of)
+        if original is None or original.translation_of is not None:
+            raise ValueError(f"{question.id}: translation_of must name an original question")
+        if original.language == question.language:
+            raise ValueError(f"{question.id}: a translation must change the language")
+        graded_the_same = (
+            original.category == question.category
+            and original.split == question.split
+            and original.answerable == question.answerable
+            and original.sources == question.sources
+        )
+        if not graded_the_same:
+            raise ValueError(f"{question.id}: must match {original.id} except for the wording")
