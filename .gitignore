@@ -36,3 +36,6 @@ evals/cache/
 
 # Partial results of an interrupted full eval run (resumed, then deleted)
 evals/results/*.checkpoint.jsonl
+
+# Personal Claude Code settings (never commit)
+.claude/settings.local.json
