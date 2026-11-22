@@ -43,8 +43,9 @@ export function ConfirmDeleteDialog({ document }: { document: DocumentInfo }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this document?</AlertDialogTitle>
           <AlertDialogDescription>
-            <strong className="break-all">{document.filename}</strong> and its {document.chunk_count} chunks will be
-            removed from the search index, so answers can no longer cite it. This cannot be undone.
+            <strong className="break-all">{document.filename}</strong> and its {document.chunk_count}{" "}
+            {document.chunk_count === 1 ? "chunk" : "chunks"} will be removed from the search index, so answers can no
+            longer cite it. This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

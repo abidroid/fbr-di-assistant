@@ -37,7 +37,8 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <AuthProvider>
           <App />
-          <Toaster theme="light" position="top-right" richColors />
+          {/* Top-centre so toasts never cover the header's Log out button. */}
+          <Toaster theme="light" position="top-center" richColors toastOptions={{ duration: 5000 }} />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

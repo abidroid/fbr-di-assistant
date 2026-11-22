@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils"
 const MAX_UPLOAD_MB = 25
 const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".txt", ".md"]
 
+/** Errors stay longer than the default 5 s: their description explains what to fix. */
+const ERROR_TOAST_MS = 8000
+
 /** Titles for each error status the upload endpoint documents. */
 const ERROR_TITLES: Record<number, string> = {
   400: "Could not read this file",
@@ -57,6 +60,7 @@ function toastError(file: File, error: Error): void {
   const title = error instanceof ApiError ? ERROR_TITLES[error.status] : undefined
   toast.error(title ? `${title}: ${file.name}` : `Upload failed: ${file.name}`, {
     description: error.message,
+    duration: ERROR_TOAST_MS,
   })
 }
 
@@ -71,7 +75,7 @@ export function UploadDropzone() {
     for (const file of files) {
       const problem = precheck(file)
       if (problem) {
-        toast.error(`Cannot upload ${file.name}`, { description: problem })
+        toast.error(`Cannot upload ${file.name}`, { description: problem, duration: ERROR_TOAST_MS })
         continue
       }
       setCurrent(file.name)
