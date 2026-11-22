@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# FBR DI Assistant — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite + TypeScript, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router,
+react-hook-form + zod. It talks only to the FastAPI backend over HTTP.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+cd frontend
+copy .env.example .env      # VITE_API_URL=http://127.0.0.1:8000
+npm install
+npm run dev                 # http://localhost:5173 (the API must be running)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`npm run build` type-checks and writes static files to `dist/` (served by Caddy in deployment);
+`npm run lint` runs oxlint.
+
+## Structure
+
+| Path | Purpose |
+| --- | --- |
+| `src/lib/api.ts` | Types mirroring `/openapi.json` and one function per endpoint; Bearer header, error shape, 401 handling |
+| `src/context/AuthContext.tsx` | JWT in localStorage, current user from `/auth/me`, logout on 401 |
+| `src/components/RouteGuards.tsx` | `RequireAuth` / `GuestOnly` route wrappers |
+| `src/pages/` | Login, Signup, Home (documents + chat) |
+| `src/hooks/useDocuments.ts` | Documents list (polls while processing), upload, delete |
+| `src/components/documents/` | Drag-and-drop upload, documents table, delete confirmation |
+| `src/components/chat/` | Chat, answer with `[n]` citations, retrieved chunks panel with both scores |
+| `src/components/ui/` | shadcn/ui components (generated, not edited) |
