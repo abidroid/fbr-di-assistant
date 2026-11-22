@@ -28,6 +28,7 @@ from qdrant_client import AsyncQdrantClient, models
 from app.config import settings
 from app.ingestion.embed import DenseEmbedder, SparseEmbedder, SparseVector, silence_progress_bars
 from app.ingestion.store import DENSE_VECTOR, SPARSE_VECTOR, with_retries
+from app.observability import span
 
 # Files in the reranker repository that PyTorch inference does not need.
 MODEL_SKIP = ["onnx/*", "imgs/*", "*.jpg", "*.webp"]
@@ -287,30 +288,45 @@ async def retrieve(
     timings: dict[str, float] = {}
 
     started = time.perf_counter()
-    dense_vector, sparse_vector = await embed_query(question, retrievers, config.mode)
+    with span("embed_query", mode=config.mode):
+        dense_vector, sparse_vector = await embed_query(question, retrievers, config.mode)
     timings["embed"] = _ms_since(started)
 
     started = time.perf_counter()
-    points = await search_candidates(
-        retrievers.qdrant, collection, dense_vector, sparse_vector, owner_id, config
-    )
-    chunks = [to_chunk(point, dense_vector, rank) for rank, point in enumerate(points, start=1)]
+    with span("search", collection=collection) as step:
+        points = await search_candidates(
+            retrievers.qdrant, collection, dense_vector, sparse_vector, owner_id, config
+        )
+        chunks = [to_chunk(point, dense_vector, rank) for rank, point in enumerate(points, 1)]
+        step.update(candidates=len(chunks))
     timings["search"] = _ms_since(started)
 
     started = time.perf_counter()
     best_rerank_score: float | None = None
-    if config.rerank and chunks:
-        # Only the best fused candidates are worth the reranker's ~1 s each.
-        chunks = await rerank(question, chunks[: config.rerank_candidates], retrievers.reranker)
-        best_rerank_score = max(chunk.rerank_score or 0.0 for chunk in chunks)
-        chunks = apply_boosts(chunks, exact_tokens(question), config)
+    with span("rerank", enabled=config.rerank) as step:
+        if config.rerank and chunks:
+            # Only the best fused candidates are worth the reranker's ~1 s each.
+            chunks = await rerank(question, chunks[: config.rerank_candidates], retrievers.reranker)
+            best_rerank_score = max(chunk.rerank_score or 0.0 for chunk in chunks)
+            chunks = apply_boosts(chunks, exact_tokens(question), config)
+            step.update(pairs=min(len(points), config.rerank_candidates))
+        top = [replace(chunk, rank=rank) for rank, chunk in enumerate(chunks[: config.top_k], 1)]
+        below = is_below_threshold(top, best_rerank_score, config)
+        # Ids and scores, not text: enough to debug ranking without copying documents.
+        step.update(
+            output=[
+                {"chunk_id": c.chunk_id, "filename": c.filename, "score": c.rerank_score}
+                for c in top
+            ],
+            best_rerank_score=best_rerank_score,
+            below_threshold=below,
+        )
     timings["rerank"] = _ms_since(started)
 
-    top = [replace(chunk, rank=rank) for rank, chunk in enumerate(chunks[: config.top_k], 1)]
     return RetrievalResult(
         chunks=top,
         best_rerank_score=best_rerank_score,
-        below_threshold=is_below_threshold(top, best_rerank_score, config),
+        below_threshold=below,
         timings_ms=timings,
     )
 

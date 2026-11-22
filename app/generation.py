@@ -20,7 +20,7 @@ import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from anthropic import (
     APIConnectionError,
@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
 from app.exceptions import UpstreamUnavailableError
+from app.observability import llm_cost, span
 from app.retrieval import RetrievedChunk
 
 logger = logging.getLogger(__name__)
@@ -170,6 +171,55 @@ class ClaudeLLM:
             "output_config": {"effort": effort},
             "output_format": schema,
         }
+        # One generation span per call (answer, rewrite, classifier, judge),
+        # named after the reply type. No prompt as input: it holds whole
+        # document chunks and the system prompt's canary.
+        with span(
+            f"llm.{schema.__name__}",
+            kind="generation",
+            model=model,
+            effort=effort,
+            max_tokens=max_tokens,
+        ) as generation:
+            response = await self._send(request, schema, fallback)
+            if response is None:
+                generation.update(level="WARNING", status_message="invalid_reply")
+                return None
+            usage = usage_details(response.usage)
+            # response.model, not the requested one: a refusal fallback may
+            # have answered with another model, which has another price.
+            generation.update(
+                model=response.model,
+                usage=usage,
+                cost=llm_cost(response.model, usage),
+                stop_reason=response.stop_reason,
+            )
+            if response.stop_reason in ("refusal", "max_tokens"):
+                logger.warning("LLM stopped with %s (%s)", response.stop_reason, model)
+                generation.update(level="WARNING", status_message=response.stop_reason)
+                return None
+            parsed = response.parsed_output
+            if parsed is not None:
+                generation.update(output=parsed.model_dump())
+            return parsed
+
+    async def _send(
+        self, request: dict[str, Any], schema: type[BaseModel], fallback: bool
+    ) -> Any | None:
+        """Send one request, translating SDK errors into domain errors.
+
+        Args:
+            request: Messages API parameters.
+            schema: Expected reply type (for the log line).
+            fallback: Use the server-side refusal fallback (beta).
+
+        Returns:
+            The SDK response, or None if the reply did not validate.
+
+        Raises:
+            UpstreamUnavailableError: If the API still fails after the SDK's retries.
+        """
+        model = request["model"]
         try:
             if fallback:
                 response = await self._client.beta.messages.parse(
@@ -194,11 +244,25 @@ class ClaudeLLM:
         except APIConnectionError as exc:  # includes timeouts
             logger.warning("LLM connection failed after retries (%s)", model)
             raise UpstreamUnavailableError() from exc
+        return response
 
-        if response.stop_reason in ("refusal", "max_tokens"):
-            logger.warning("LLM stopped with %s (%s)", response.stop_reason, model)
-            return None
-        return response.parsed_output
+
+def usage_details(usage: Any) -> dict[str, int]:
+    """Read the token counts of one Anthropic response.
+
+    Args:
+        usage: ``response.usage`` from the SDK.
+
+    Returns:
+        Counts under the keys Langfuse and `llm_cost` expect. ``input`` excludes
+        cached tokens, which the API reports (and bills) separately.
+    """
+    return {
+        "input": usage.input_tokens,
+        "output": usage.output_tokens,
+        "cache_read_input_tokens": usage.cache_read_input_tokens or 0,
+        "cache_creation_input_tokens": usage.cache_creation_input_tokens or 0,
+    }
 
 
 @dataclass

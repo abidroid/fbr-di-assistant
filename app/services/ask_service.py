@@ -31,6 +31,7 @@ from app.generation import (
     rewrite_followup,
 )
 from app.models import Document, DocumentStatus, User
+from app.observability import span, trace
 from app.retrieval import RetrievalConfig, RetrievalResult, RetrievedChunk, Retrievers, retrieve
 from app.schemas import AskRequest, AskResponse, Citation, RetrievedChunkOut, Timings
 
@@ -81,9 +82,34 @@ async def ask(
         GuardrailBlockedError: If the question is an injection or jailbreak (400).
         UpstreamUnavailableError: If Qdrant or Anthropic stay unavailable (503).
     """
+    # One trace per question; every span opened below becomes part of it.
+    with trace(
+        "ask",
+        request_id=request_id,
+        user_id=user.id,
+        tags=["api"],
+        input={"question": request.question, "history_turns": len(request.history)},
+    ) as root:
+        response = await _ask(session, user, request, retrievers, llm, classifier, request_id)
+        root.update(output=trace_output(response))
+        return response
+
+
+async def _ask(
+    session: AsyncSession,
+    user: User,
+    request: AskRequest,
+    retrievers: Retrievers,
+    llm: LLM,
+    classifier: guardrails.InputClassifier,
+    request_id: str,
+) -> AskResponse:
+    """Run `ask` inside its trace (same arguments, returns and raises as `ask`)."""
     started = time.perf_counter()
     user_turns = [turn.content for turn in request.history if turn.role == "user"]
-    verdict = await guardrails.check_input(request.question, user_turns, classifier)
+    with span("guardrails.input") as step:
+        verdict = await guardrails.check_input(request.question, user_turns, classifier)
+        step.update(output=verdict)
     guard_ms = _ms_since(started)
     if verdict in ("injection", "jailbreak"):
         # Log the kind only: the text is attacker-controlled and may be long.
@@ -115,6 +141,25 @@ async def ask(
         guardrails_ms=guard_ms,
     )
     return outcome.response
+
+
+def trace_output(response: AskResponse) -> dict[str, object]:
+    """Summarise a response for the trace (the answer, not the chunk texts).
+
+    Args:
+        response: What the API returns.
+
+    Returns:
+        Answer, flags, citation pages and timings.
+    """
+    return {
+        "answer": response.answer,
+        "answerable": response.answerable,
+        "language": response.language,
+        "citations": [f"{c.filename} p.{c.page_start}" for c in response.citations],
+        "chunk_count": response.chunk_count,
+        "timings_ms": response.timings_ms.model_dump(),
+    }
 
 
 async def count_ready_documents(session: AsyncSession, user: User) -> int:
@@ -165,24 +210,35 @@ async def answer_question(
         UpstreamUnavailableError: If Qdrant or Anthropic stay unavailable (503).
     """
     started = time.perf_counter()
-    standalone = await rewrite_followup(question, history[-settings.history_max_turns :], llm)
+    with span("rewrite", history_turns=len(history)) as step:
+        standalone = await rewrite_followup(question, history[-settings.history_max_turns :], llm)
+        step.update(output=standalone, rewritten=standalone != question)
     rewrite_ms = _ms_since(started)
 
-    found = await retrieve(standalone, owner_id, retrievers, config, collection)
+    with span("retrieval", input=standalone):
+        found = await retrieve(standalone, owner_id, retrievers, config, collection)
 
     generation_started = time.perf_counter()
     result: GenerationResult | None = None
-    if found.below_threshold:
-        # The documents almost certainly do not hold the answer: refuse
-        # without paying for (or waiting on) an LLM call.
-        answer = refusal(detect_language(question), "below_threshold")
-    else:
-        result = await generate(standalone, found.chunks, llm)
-        answer = result
+    with span("generation", chunks=len(found.chunks)) as step:
+        if found.below_threshold:
+            # The documents almost certainly do not hold the answer: refuse
+            # without paying for (or waiting on) an LLM call.
+            answer = refusal(detect_language(question), "below_threshold")
+        else:
+            result = await generate(standalone, found.chunks, llm)
+            answer = result
+        step.update(
+            answerable=answer.answerable,
+            refusal_reason=answer.refusal_reason,
+            cited=[ref.n for ref in answer.citations],
+        )
     generation_ms = _ms_since(generation_started)
 
     guard_started = time.perf_counter()
-    answer = _check_leaks(answer)
+    with span("guardrails.output") as step:
+        answer = _check_leaks(answer)
+        step.update(output=answer.refusal_reason or "ok")
     guardrails_ms = round(guardrails_ms + _ms_since(guard_started), 1)
 
     timings = Timings(

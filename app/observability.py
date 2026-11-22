@@ -25,7 +25,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -379,8 +379,32 @@ class LangfuseTracer(NoopTracer):
 _tracer: NoopTracer = NoopTracer()
 
 
-def setup_tracing() -> NoopTracer:
+def mask_strings(data: Any, redact: Callable[[str], str]) -> Any:
+    """Apply a redaction function to every string inside nested data.
+
+    Args:
+        data: A span's input, output or metadata (str, dict, list or scalar).
+        redact: Turns one string into its redacted form.
+
+    Returns:
+        The same structure with every string redacted.
+    """
+    if isinstance(data, str):
+        return redact(data)
+    if isinstance(data, Mapping):
+        return {key: mask_strings(value, redact) for key, value in data.items()}
+    if isinstance(data, list | tuple):
+        return [mask_strings(value, redact) for value in data]
+    return data
+
+
+def setup_tracing(redact: Callable[[str], str] | None = None) -> NoopTracer:
     """Use Langfuse if both keys are configured, otherwise stay a no-op.
+
+    Args:
+        redact: Applied to every string sent to Langfuse (the app passes the
+            guardrails' leak redaction, so a leaked canary or key never
+            reaches a third party even if a model repeats it).
 
     Returns:
         The tracer now in use.
@@ -395,6 +419,7 @@ def setup_tracing() -> NoopTracer:
         secret_key=secret_key.get_secret_value(),
         base_url=settings.langfuse_host,
         environment=settings.langfuse_environment,
+        mask=(lambda *, data, **_: mask_strings(data, redact)) if redact else None,
     )
     set_tracer(LangfuseTracer(client))
     tracing_logger.info("Langfuse tracing on (environment=%s)", settings.langfuse_environment)

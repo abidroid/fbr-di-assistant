@@ -24,8 +24,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.db import engine
 from app.exceptions import DomainError, UpstreamUnavailableError
-from app.generation import ClaudeLLM
-from app.guardrails import LLMClassifier, limiter
+from app.generation import ClaudeLLM, leak_markers
+from app.guardrails import LLMClassifier, limiter, redact
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # upload creates the collection anyway.
         logger.warning("Could not prepare the Qdrant collection at startup", exc_info=True)
     # Langfuse if its keys are in .env, otherwise a no-op (tests never get here).
-    setup_tracing()
+    setup_tracing(redact=lambda text: redact(text, leak_markers()))
     logger.info("Startup complete")
     try:
         yield

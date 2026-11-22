@@ -122,6 +122,27 @@ def check_output(text: str, protected: Iterable[str]) -> str | None:
     return None
 
 
+def redact(text: str, protected: Iterable[str]) -> str:
+    """Blank out leak markers and secrets so text can go to a log or trace.
+
+    Uses the same markers and patterns as `check_output`, so anything that
+    check would catch in an answer is also kept out of Langfuse.
+
+    Args:
+        text: Any text about to leave the server.
+        protected: The canary and system-prompt fragments.
+
+    Returns:
+        The text with each match replaced by ``[redacted]``.
+    """
+    for marker in protected:
+        if marker:
+            text = re.sub(re.escape(marker), "[redacted]", text, flags=re.IGNORECASE)
+    for pattern in LEAK_PATTERNS.values():
+        text = pattern.sub("[redacted]", text)
+    return text
+
+
 # --- Input checks ----------------------------------------------------------------
 
 Verdict = Literal["ok", "injection", "jailbreak", "off_topic"]
