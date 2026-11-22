@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import json
 import logging
+import uuid
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
@@ -28,10 +29,12 @@ from qdrant_client import AsyncQdrantClient
 
 from app.config import settings
 from app.exceptions import UpstreamUnavailableError
-from app.generation import LLM, ClaudeLLM
+from app.generation import LLM, ClaudeLLM, leak_markers
+from app.guardrails import redact
 from app.ingestion.caption import ClaudeCaptioner
 from app.ingestion.embed import create_embedders
 from app.ingestion.extract import Extractor
+from app.observability import setup_tracing, shutdown_tracing, span, trace
 from app.retrieval import Reranker, RetrievalResult, Retrievers, create_reranker, retrieve
 from app.services.ask_service import answer_question
 from app.services.document_service import Pipeline
@@ -276,28 +279,40 @@ async def answer_and_grade(
     Returns:
         The question's full result.
     """
-    outcome = await answer_question(
-        question.question,
-        [],
-        EVAL_OWNER_ID,
-        retrievers,
-        llm,
-        config=config.retrieval.to_config(),
-        collection=config.collection_name(),
-    )
-    assert outcome.retrieval is not None  # retrieval always runs without an empty-index check
-    response = outcome.response
-    contexts = [chunk.text for chunk in outcome.retrieval.chunks]
-    score = await score_answer(
-        question=question.question,
-        expected_answerable=question.answerable,
-        reference=question.reference_answer,
-        answer=response.answer,
-        refused=not response.answerable,
-        contexts=contexts,
-        cited=cited_texts(response.answer, contexts),
-        llm=llm,
-    )
+    # One trace per golden question, tagged so the metrics report can compare
+    # configs. A fresh id per run: reruns must not merge into old traces.
+    with trace(
+        "eval",
+        request_id=uuid.uuid4().hex,
+        tags=["eval", f"config:{config.name}", f"split:{question.split}"],
+        input={"question_id": question.id, "question": question.question},
+    ) as root:
+        outcome = await answer_question(
+            question.question,
+            [],
+            EVAL_OWNER_ID,
+            retrievers,
+            llm,
+            request_id=root.record.metadata["request_id"],
+            config=config.retrieval.to_config(),
+            collection=config.collection_name(),
+        )
+        assert outcome.retrieval is not None  # retrieval always runs without an empty-index check
+        response = outcome.response
+        contexts = [chunk.text for chunk in outcome.retrieval.chunks]
+        # The judge's LLM calls land in this trace too, as llm.* generations.
+        with span("judge"):
+            score = await score_answer(
+                question=question.question,
+                expected_answerable=question.answerable,
+                reference=question.reference_answer,
+                answer=response.answer,
+                refused=not response.answerable,
+                contexts=contexts,
+                cited=cited_texts(response.answer, contexts),
+                llm=llm,
+            )
+        root.update(output={"verdict": score.verdict, "answer": response.answer})
     generation = outcome.generation
     return AnswerResult(
         retrieval=to_result(question, outcome.retrieval, config.metrics.k),
@@ -449,6 +464,9 @@ async def main(argv: list[str] | None = None) -> None:
                 ingested.add(config.collection_name())
 
         if args.stage == "full":
+            # Same tracing as the API (no-op without Langfuse keys), with the
+            # same leak redaction before anything leaves the machine.
+            setup_tracing(redact=lambda text: redact(text, leak_markers()))
             llm = ClaudeLLM()
             for config in configs:
                 print(f"Answering and judging {config.name}")
@@ -475,6 +493,8 @@ async def main(argv: list[str] | None = None) -> None:
             path.write_text(comparison_markdown(args.split, k, rows), encoding="utf-8")
             print(path.read_text(encoding="utf-8"))
     finally:
+        # Send the last batch of eval traces before the process exits.
+        shutdown_tracing()
         await qdrant.close()
 
 
