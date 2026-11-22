@@ -187,21 +187,43 @@ class Settings(BaseSettings):
     rewrite_max_tokens: int = 512
     # Earlier turns sent with a follow-up question (user + assistant messages).
     history_max_turns: int = 6
-    # Fixed texts, so the frontend and the evaluation can recognise them exactly.
-    refusal_message: str = "I couldn't find this in your documents."
-    empty_index_message: str = (
-        "You don't have any searchable documents yet. Upload a document (or wait until it "
-        "finishes processing), then ask about it."
-    )
-    legal_disclaimer: str = "This is not legal advice; check the cited rule."
-    # Input guardrail replies. Blocked (injection/jailbreak) is a 400 with a
-    # fixed message that tells an attacker nothing about which check fired.
+    # Fixed texts, one per answer language. Code adds them (not the model), so
+    # they are exact and the evaluation can recognise them. Keys are ISO 639-1
+    # codes as returned by generation.detect_language; "en" is the fallback.
+    refusal_messages: dict[str, str] = {
+        "en": "I couldn't find this in your documents.",
+        "ur": "مجھے یہ معلومات آپ کی دستاویزات میں نہیں ملیں۔",
+    }
+    empty_index_messages: dict[str, str] = {
+        "en": (
+            "You don't have any searchable documents yet. Upload a document (or wait until "
+            "it finishes processing), then ask about it."
+        ),
+        "ur": (
+            "آپ کی کوئی قابلِ تلاش دستاویز ابھی موجود نہیں۔ پہلے کوئی دستاویز اپ لوڈ کریں "
+            "(یا اس کی پروسیسنگ مکمل ہونے کا انتظار کریں)، پھر اس کے بارے میں سوال پوچھیں۔"
+        ),
+    }
+    legal_disclaimers: dict[str, str] = {
+        "en": "This is not legal advice; check the cited rule.",
+        "ur": "یہ قانونی مشورہ نہیں ہے؛ حوالہ دیا گیا قاعدہ خود دیکھ لیں۔",
+    }
+    off_topic_messages: dict[str, str] = {
+        "en": (
+            "I can only answer questions about your uploaded documents, such as FBR Digital "
+            "Invoicing rules, fields and error codes. Please ask about those."
+        ),
+        "ur": (
+            "میں صرف آپ کی اپ لوڈ کی گئی دستاویزات کے بارے میں سوالات کے جواب دے سکتا ہوں، "
+            "جیسے FBR ڈیجیٹل انوائسنگ کے قواعد، فیلڈز اور ایرر کوڈز۔ "
+            "براہِ کرم انہی کے بارے میں پوچھیں۔"
+        ),
+    }
+    # Blocked (injection/jailbreak) is a 400 error body with a fixed message that
+    # tells an attacker nothing about which check fired. It stays English, like
+    # every other API error; only answers (200s) follow the question's language.
     blocked_message: str = (
         "Sorry, I can't help with that request. Please ask a question about your documents."
-    )
-    off_topic_message: str = (
-        "I can only answer questions about your uploaded documents, such as FBR Digital "
-        "Invoicing rules, fields and error codes. Please ask about those."
     )
     # The verdict JSON is a few tokens; a small cap keeps the call cheap.
     classifier_max_tokens: int = 64
@@ -229,6 +251,19 @@ class Settings(BaseSettings):
     db_max_retries: int = 3
     # A health check must answer quickly, so each dependency gets a short timeout.
     health_timeout_s: float = 3.0
+
+    @staticmethod
+    def localised(texts: dict[str, str], language: str) -> str:
+        """Pick the fixed text for a language, falling back to English.
+
+        Args:
+            texts: One of the ``*_messages`` / ``legal_disclaimers`` maps.
+            language: ISO 639-1 code, e.g. ``en`` or ``ur``.
+
+        Returns:
+            The text in that language, or the English one if it has none.
+        """
+        return texts.get(language, texts["en"])
 
 
 @lru_cache

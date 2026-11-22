@@ -15,6 +15,7 @@ from app.generation import (
     detect_language,
     extract_citations,
     generate,
+    refusal,
     rewrite_followup,
 )
 from app.retrieval import RetrievedChunk
@@ -55,7 +56,7 @@ CHUNKS = [make_chunk(1), make_chunk(2), make_chunk(3)]
 
 def test_system_prompt_holds_the_refusal_sentence_and_canary() -> None:
     prompt = build_system_prompt()
-    assert settings.refusal_message in prompt
+    assert settings.refusal_messages["en"] in prompt
     assert settings.prompt_canary in prompt
 
 
@@ -113,7 +114,7 @@ async def test_valid_answer_gets_citations_from_metadata_and_disclaimer() -> Non
     llm = FakeLLM([answer("Up to 30 days [2].", [2])])
     result = await generate("How long?", CHUNKS, llm)
     assert result.answerable
-    assert result.answer == f"Up to 30 days [2].\n\n{settings.legal_disclaimer}"
+    assert result.answer == f"Up to 30 days [2].\n\n{settings.legal_disclaimers['en']}"
     assert [(c.n, c.chunk.filename, c.chunk.page_start) for c in result.citations] == [
         (2, "file2.pdf", 2)
     ]
@@ -139,7 +140,7 @@ async def test_no_valid_citation_twice_refuses() -> None:
     llm = FakeLLM([answer("Thirty days.", []), answer("Still thirty days.", [])])
     result = await generate("How long?", CHUNKS, llm)
     assert not result.answerable
-    assert result.answer == settings.refusal_message
+    assert result.answer == settings.refusal_messages["en"]
     assert result.refusal_reason == "no_citation"
     assert result.citations == []
 
@@ -147,7 +148,7 @@ async def test_no_valid_citation_twice_refuses() -> None:
 async def test_model_saying_not_answerable_gives_the_exact_refusal() -> None:
     llm = FakeLLM([answer("anything", [], answerable=False)])
     result = await generate("Income tax rate?", CHUNKS, llm)
-    assert result.answer == settings.refusal_message
+    assert result.answer == settings.refusal_messages["en"]
     assert result.refusal_reason == "model"
     assert len(llm.calls) == 1
 
@@ -196,3 +197,44 @@ async def test_failed_rewrite_falls_back_to_the_original_question() -> None:
 def test_detect_language() -> None:
     assert detect_language("What is error 0052?") == "en"
     assert detect_language("ایرر 0052 کا مطلب کیا ہے؟") == "ur"
+
+
+# --- Urdu --------------------------------------------------------------------------
+
+URDU_QUESTION = "کمشنر انٹیگریشن کی تاریخ کتنی بڑھا سکتا ہے؟"
+
+
+def test_system_prompt_tells_the_model_to_answer_in_the_question_language() -> None:
+    prompt = build_system_prompt()
+    assert "Answer in the language of the question" in prompt
+    assert "an Urdu question gets an Urdu answer" in prompt
+
+
+async def test_urdu_answer_gets_the_urdu_disclaimer_and_language() -> None:
+    llm = FakeLLM([answer("کمشنر ساٹھ دن تک توسیع کر سکتا ہے [1]۔", [1])])
+    result = await generate(URDU_QUESTION, CHUNKS, llm)
+    assert result.answerable and result.language == "ur"
+    assert result.answer.endswith(settings.legal_disclaimers["ur"])
+    assert settings.legal_disclaimers["en"] not in result.answer
+
+
+async def test_language_comes_from_the_answer_script_not_the_model_claim() -> None:
+    # The model claims "ur" but writes English: the user reads English, so
+    # the disclaimer and the reported language must be English.
+    reply = answer("Up to sixty days [1].", [1]).model_copy(update={"language": "ur"})
+    result = await generate(URDU_QUESTION, CHUNKS, FakeLLM([reply]))
+    assert result.language == "en"
+    assert result.answer.endswith(settings.legal_disclaimers["en"])
+
+
+async def test_urdu_question_is_refused_in_urdu() -> None:
+    # The model's reply says "en": the question's script decides the refusal language.
+    llm = FakeLLM([answer("I couldn't find this in your documents.", [], answerable=False)])
+    result = await generate(URDU_QUESTION, CHUNKS, llm)
+    assert result.answer == settings.refusal_messages["ur"]
+    assert result.language == "ur"
+
+
+def test_refusal_falls_back_to_english_for_other_languages() -> None:
+    assert refusal("fr", "model").answer == settings.refusal_messages["en"]
+    assert settings.localised(settings.legal_disclaimers, "de") == settings.legal_disclaimers["en"]

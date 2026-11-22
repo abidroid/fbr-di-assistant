@@ -118,13 +118,13 @@ async def _ask(
     if verdict == "off_topic":
         # A fair request we cannot help with: a polite 200 refusal, like "not found".
         return message_response(
-            settings.off_topic_message, request.question, request_id, guard_ms, _ms_since(started)
+            settings.off_topic_messages, request.question, request_id, guard_ms, _ms_since(started)
         )
 
     if await count_ready_documents(session, user) == 0:
         # Say what is actually wrong instead of "I couldn't find this".
         return message_response(
-            settings.empty_index_message,
+            settings.empty_index_messages,
             request.question,
             request_id,
             guard_ms,
@@ -328,15 +328,19 @@ def build_response(
 
 
 def message_response(
-    message: str, question: str, request_id: str, guardrails_ms: float, elapsed_ms: float
+    messages: dict[str, str],
+    question: str,
+    request_id: str,
+    guardrails_ms: float,
+    elapsed_ms: float,
 ) -> AskResponse:
     """Build a not-answerable response with a fixed message and no retrieval.
 
     Used for off-topic questions and for users with no searchable documents.
 
     Args:
-        message: The fixed text to return as the answer.
-        question: The question (for its language).
+        messages: The fixed text per language (from settings).
+        question: The question; its language picks the text.
         request_id: Id of this request.
         guardrails_ms: Time spent in the input checks.
         elapsed_ms: Time spent so far.
@@ -344,11 +348,12 @@ def message_response(
     Returns:
         The response.
     """
+    language = detect_language(question)
     return AskResponse(
         request_id=request_id,
-        answer=message,
+        answer=settings.localised(messages, language),
         answerable=False,
-        language=detect_language(question),
+        language=language,
         citations=[],
         general_context=None,
         chunk_count=0,
