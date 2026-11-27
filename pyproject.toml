@@ -28,10 +28,27 @@ dependencies = [
     "slowapi>=0.1.10",
     "sqlalchemy[asyncio]>=2.1.9",
     "tenacity>=9.2.1",
+    # Listed directly (they come in via FlagEmbedding and Docling) so that
+    # [tool.uv.sources] below can pick the CPU-only build on Linux.
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
 ]
 
 [tool.uv]
 package = false
+
+# On Linux, PyPI's torch bundles the CUDA (GPU) libraries: several GB that a CPU
+# server never uses. PyTorch's own CPU index serves a ~200 MB build instead.
+# Windows and macOS wheels on PyPI are already CPU-only, so they stay on PyPI.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+# explicit: only packages listed in [tool.uv.sources] come from this index.
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [dependency-groups]
 dev = [
