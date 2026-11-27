@@ -1,0 +1,83 @@
+# Production stack: one server, three containers on a private Docker network.
+#
+#   browser --HTTPS--> caddy (:80/:443) --/api/*--> api (:8000) --> qdrant (:6333)
+#                        |                           |--> Neon PostgreSQL (cloud)
+#                        +-- React files              +--> Anthropic, Langfuse (cloud)
+#
+# Only caddy publishes ports. Docker-published ports bypass the ufw firewall,
+# so api and qdrant publish none: nothing outside this server can reach them.
+#
+# Usage (see README "Deployment"):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
+#
+# DOMAIN comes from .env (e.g. DOMAIN=203-0-113-5.sslip.io); unset = localhost.
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    # Secrets and settings, read when the container starts (never baked in).
+    env_file: .env
+    environment:
+      # Overrides for production; everything else comes from .env.
+      QDRANT_URL: http://qdrant:6333
+      LANGFUSE_ENVIRONMENT: production
+      # The browser loads the page and the API from the same origin, so CORS
+      # is not needed; listing the site keeps the setting truthful anyway.
+      CORS_ORIGINS: '["https://${DOMAIN:-localhost}"]'
+    volumes:
+      - uploads:/app/uploads
+      # Model weights (~4.5 GB): downloaded on first start, reused afterwards.
+      - models:/models
+    depends_on:
+      - qdrant
+    healthcheck:
+      # /health checks Neon and Qdrant. Python is used because the slim image
+      # has no curl.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=10)"
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      # The first start downloads the models (several minutes); failures during
+      # this period do not count.
+      start_period: 15m
+
+  qdrant:
+    # Same version as development, matching qdrant-client 1.20.
+    image: qdrant/qdrant:v1.20.1
+    restart: unless-stopped
+    # No ports: only the api container reaches it, by the name "qdrant".
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  caddy:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80" # HTTP: Let's Encrypt's check, then redirect to HTTPS
+      - "443:443" # HTTPS
+      - "443:443/udp" # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here; losing them would mean re-issuing on every
+      # restart and hitting Let's Encrypt's rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        # Do not open the site before the API has loaded its models.
+        condition: service_healthy
+
+volumes:
+  uploads:
+  models:
+  qdrant_storage:
+  caddy_data:
+  caddy_config:

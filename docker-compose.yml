@@ -1,4 +1,4 @@
-# Local services. Phase 1: Qdrant only (dev). The api and caddy services are added in Phase 11.
+# Development services: Qdrant only. Production uses docker-compose.prod.yml (api, qdrant, caddy).
 services:
   qdrant:
     # Pinned to match qdrant-client 1.20, so client and server speak the same API.
