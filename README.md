@@ -426,12 +426,108 @@ Source: [`evals/results/2026-11-22_final_ur.md`](evals/results/2026-11-22_final_
 
 ## Deployment
 
-**Status: pending.** The planned production setup is one Linux VPS (4 vCPU / 8 GB RAM) running
-Docker Compose with three services: `api` (FastAPI + models), `qdrant` (with a persistent volume) and
-`caddy` (serves the built frontend and reverse-proxies the API with automatic HTTPS). Neon
-PostgreSQL and Langfuse stay as managed cloud services.
+**Live URL:** *to be added after deployment.*
 
-Live URL: *to be added after deployment.*
+One Linux VPS (Contabo Cloud VPS, 8 vCPU / 24 GB RAM, Ubuntu 24.04) runs three containers with
+Docker Compose ([`docker-compose.prod.yml`](docker-compose.prod.yml)). Neon PostgreSQL, Anthropic
+and Langfuse stay managed cloud services.
+
+```text
+browser --HTTPS--> caddy (:80/:443) --/api/*--> api (:8000) --> qdrant (:6333)
+                     |                           |--> Neon PostgreSQL
+                     +-- React app (static)       +--> Anthropic, Langfuse
+```
+
+| Container | Image | What it does |
+| --- | --- | --- |
+| `caddy` | [`frontend/Dockerfile`](frontend/Dockerfile) | Serves the built React app, forwards `/api/*` to the API (prefix stripped), gets and renews the HTTPS certificate automatically ([`Caddyfile`](Caddyfile)) |
+| `api` | [`Dockerfile`](Dockerfile) | FastAPI with BGE-M3, BM25 and the reranker; one worker (each worker would load its own ~5 GB of models); runs as a non-root user |
+| `qdrant` | `qdrant/qdrant:v1.20.1` | Vector database; no published port, reachable only by the API |
+
+Design choices:
+
+- **Only Caddy publishes ports.** Docker-published ports bypass the `ufw` firewall, so `api` and `qdrant` publish none.
+- **Model weights live in a volume, not in the image.** They download once on first start (~4.5 GB), so the image stays small and rebuilds stay fast.
+- **CPU-only torch on Linux** (`[tool.uv.sources]` in `pyproject.toml`). PyPI's Linux wheel would add several GB of CUDA libraries the server never uses.
+- **Secrets stay in `.env` on the server.** They're read at container start and never copied into an image ([`.dockerignore`](.dockerignore)).
+- **Evaluations run locally, never against the live app.**
+
+### Run the production stack locally
+
+Needs Docker Desktop and a network that reaches Neon on port 5432.
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml logs -f api   # first start downloads the models
+```
+
+Open https://localhost. The browser warns about Caddy's local certificate, which is expected.
+The API is at https://localhost/api/docs.
+
+### Deploy to a VPS (Ubuntu 24.04)
+
+1. **Order the server** with your SSH public key (`ssh-keygen -t ed25519` if you have none) and log in:
+   `ssh root@<server-ip>`.
+2. **Secure it.** Create a normal user, then turn off password and root logins:
+
+   ```bash
+   apt update && apt upgrade -y
+   adduser deploy && usermod -aG sudo deploy
+   rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
+   sed -i -e 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' \
+          -e 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+   systemctl restart ssh
+   ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
+   ```
+
+   From now on, log in with `ssh deploy@<server-ip>`.
+3. **Install Docker:**
+
+   ```bash
+   curl -fsSL https://get.docker.com | sudo sh
+   sudo usermod -aG docker deploy   # log out and back in afterwards
+   ```
+
+4. **Get the code and write `.env`** by hand on the server. Copy the keys from `.env.example`. The production overrides (Qdrant address, CORS, Langfuse environment) are already set in the compose file.
+
+   ```bash
+   git clone https://github.com/abidroid/fbr-di-assistant.git && cd fbr-di-assistant
+   nano .env
+   ```
+
+   Add `DOMAIN=<server-ip-with-dashes>.sslip.io` (for example `203-0-113-5.sslip.io`). [sslip.io](https://sslip.io) resolves that name to the IP, so Let's Encrypt can issue a real certificate without buying a domain.
+5. **Start the stack and migrate the database.** The first start takes a few minutes while the models download; `ps` shows `api` as `healthy` when it's ready.
+
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d --build
+   docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
+   docker compose -f docker-compose.prod.yml ps
+   ```
+
+6. **Seed the demo account from your laptop.** The corpus PDFs are on the laptop, not the server.
+
+   ```bash
+   uv run python scripts/seed_demo.py --base-url https://<domain>/api --email <demo-email>
+   ```
+
+   Large documents embed in the background. The script waits until each one is `ready`.
+
+### Operate
+
+```bash
+# Update after a push to main
+git pull && docker compose -f docker-compose.prod.yml up -d --build
+
+# Logs (one line per request, with request_id) and status
+docker compose -f docker-compose.prod.yml logs -f --tail 100 api
+docker compose -f docker-compose.prod.yml ps
+
+# Back up uploads and vectors (users and documents rows are in Neon)
+docker run --rm -v fbr-di-assistant_uploads:/data -v "$PWD":/backup alpine \
+  tar czf /backup/uploads.tgz -C /data .
+docker run --rm -v fbr-di-assistant_qdrant_storage:/data -v "$PWD":/backup alpine \
+  tar czf /backup/qdrant.tgz -C /data .
+```
 
 ---
 

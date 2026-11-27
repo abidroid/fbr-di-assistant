@@ -50,7 +50,7 @@ Prefer clear, conventional code over clever code, and follow the Teaching mode r
 | Files | Saved under `UPLOAD_DIR/<owner_id>/<doc_id>.<ext>`; deleted with the document |
 | Observability | Langfuse Cloud (free tier) via its Python SDK; request-id logging middleware |
 | Frontend | React + Vite + TypeScript, Tailwind CSS v4, shadcn/ui, TanStack Query, React Router |
-| Deployment | One Linux VPS, 4 vCPU / 8 GB RAM, Docker Compose (api, qdrant, caddy serving the built frontend + HTTPS) |
+| Deployment | One Linux VPS (Contabo Cloud VPS, 8 vCPU / 24 GB RAM, Ubuntu 24.04), Docker Compose (`docker-compose.prod.yml`) (api, qdrant, caddy serving the built frontend + HTTPS via sslip.io). Evals run locally, never against the live app |
 
 ## Project structure
 ```
