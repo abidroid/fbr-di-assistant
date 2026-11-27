@@ -1,0 +1,6 @@
+# Not sent to the image build: installed packages, old builds, local settings.
+node_modules/
+dist/
+# The local .env points at http://127.0.0.1:8000; the image sets VITE_API_URL=/api.
+.env
+.env.*

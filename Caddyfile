@@ -1,0 +1,42 @@
+# Caddy: the only public entry point (ports 80/443) in production.
+#  - gets and renews the HTTPS certificate automatically for {$DOMAIN}
+#    (Let's Encrypt for a real name such as 203-0-113-5.sslip.io; for
+#    "localhost" it uses its own local certificate authority instead)
+#  - /api/*  -> the FastAPI container (prefix stripped: /api/ask -> /ask)
+#  - else    -> the built React app in /srv
+# Mounted into the caddy container by docker-compose.prod.yml.
+
+{$DOMAIN:localhost} {
+	# Compress text responses (JS, CSS, JSON answers) for faster page loads.
+	encode zstd gzip
+
+	header {
+		# Browsers must use HTTPS for this site for the next year.
+		Strict-Transport-Security "max-age=31536000"
+		# Do not guess content types (stops an uploaded file being run as script).
+		X-Content-Type-Options "nosniff"
+		# The app must not be embedded in another site's frame (clickjacking).
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Do not advertise the server software.
+		-Server
+	}
+
+	handle_path /api/* {
+		# "api" is the compose service name; Docker's private network resolves it.
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		# Vite puts a content hash in every asset file name, so they can be
+		# cached for a year; index.html must always be fetched fresh.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+		# Single-page app: /login or /documents are React routes, not files,
+		# so anything that is not a real file gets index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}
