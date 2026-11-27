@@ -1,0 +1,33 @@
+# What `docker build .` must NOT send to the builder. Keeps the build context
+# small (no multi-GB folders) and keeps secrets and data out of the image.
+
+# Secrets: .env is read by Compose at runtime, never copied into an image.
+.env
+.env.*
+!.env.example
+
+# Local environments and caches
+.venv/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.cache/
+.ipynb_checkpoints/
+.claude/
+.git/
+
+# Data: the corpus PDFs, uploads and vectors live outside the image.
+corpus/
+!corpus/manifest.jsonl
+uploads/
+qdrant_storage/
+
+# Not needed by the running API (evals run locally, never on the live app).
+evals/
+notebooks/
+tests/
+docs/
+scripts/
+
+# The frontend has its own image (frontend/Dockerfile).
+frontend/
