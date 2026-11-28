@@ -471,16 +471,32 @@ The API is at https://localhost/api/docs.
 2. **Secure it.** Create a normal user, then turn off password and root logins:
 
    ```bash
-   apt update && apt upgrade -y
+   apt update && apt upgrade -y && reboot
+   # log in again as root, then:
    adduser deploy && usermod -aG sudo deploy
-   rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
-   sed -i -e 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' \
-          -e 's/^#\?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
-   systemctl restart ssh
-   ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
+   mkdir -p /home/deploy/.ssh && cp ~/.ssh/authorized_keys /home/deploy/.ssh/
+   chown -R deploy:deploy /home/deploy/.ssh
+   chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys
    ```
 
-   From now on, log in with `ssh deploy@<server-ip>`.
+   Check that `ssh deploy@<server-ip>` and `sudo whoami` work **before** you lock root out. Then, as `deploy`:
+
+   ```bash
+   # A drop-in named 00-* is read first, and sshd keeps the first value it sees.
+   # The image's 50-cloud-init.conf turns password login ON, so editing the main
+   # sshd_config would be silently overridden.
+   sudo tee /etc/ssh/sshd_config.d/00-hardening.conf > /dev/null <<'EOF'
+   PasswordAuthentication no
+   KbdInteractiveAuthentication no
+   PermitRootLogin no
+   EOF
+   sudo sshd -t && sudo systemctl restart ssh
+   sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443 && sudo ufw enable
+   ```
+
+   From now on, log in with `ssh deploy@<server-ip>`. If the server was ordered without your SSH
+   key, add it before step 2 (from PowerShell, asks for the root password once):
+   `Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@<server-ip> "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"`.
 3. **Install Docker:**
 
    ```bash
